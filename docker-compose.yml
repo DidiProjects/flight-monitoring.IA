@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  flight-tracker:
+    build: .
+    container_name: flight-tracker
+    environment:
+      - TZ=America/Sao_Paulo
+
+      # ── Parâmetros de busca ──────────────────────────────────
+      - FLIGHT_ORIGIN=${FLIGHT_ORIGIN}
+      - FLIGHT_DESTINATION=${FLIGHT_DESTINATION}
+      - FLIGHT_TARGET=${FLIGHT_TARGET}
+      - FLIGHT_MARGIN=${FLIGHT_MARGIN:-0.1}
+      - FLIGHT_OUTBOUND_START=${FLIGHT_OUTBOUND_START}
+      - FLIGHT_OUTBOUND_END=${FLIGHT_OUTBOUND_END}
+      - FLIGHT_RETURN_START=${FLIGHT_RETURN_START}
+      - FLIGHT_RETURN_END=${FLIGHT_RETURN_END}
+      - FLIGHT_PASSENGERS=${FLIGHT_PASSENGERS:-1}
+      - FLIGHT_VERBOSE=${FLIGHT_VERBOSE:-false}
+
+      # ── Logger ───────────────────────────────────────────────
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_PRETTY=${LOG_PRETTY:-false}
+
+      # ── Email ────────────────────────────────────────────────
+      - EMAIL_ENABLED=${EMAIL_ENABLED:-false}
+      - EMAIL_RECIPIENT=${EMAIL_RECIPIENT}
+      - EMAIL_CC=${EMAIL_CC}
+      - EMAIL_SMTP_HOST=${EMAIL_SMTP_HOST}
+      - EMAIL_SMTP_PORT=${EMAIL_SMTP_PORT:-587}
+      - EMAIL_SMTP_USER=${EMAIL_SMTP_USER}
+      - EMAIL_SMTP_PASSWORD=${EMAIL_SMTP_PASSWORD}

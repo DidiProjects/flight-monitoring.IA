@@ -1,0 +1,79 @@
+name: Deploy to Server
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Executa todo dia às 08:00 horário de Brasília (11:00 UTC)
+    - cron: '0 11 * * *'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_CLIENT_SECRET }}
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Transfer files to server
+        run: |
+          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} \
+            "mkdir -p /tmp/flight-tracker-deploy"
+
+          rsync -az --delete \
+            -e "ssh -o StrictHostKeyChecking=no -p 1024" \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.env' \
+            --exclude='debug-*.png' \
+            --exclude='scripts/' \
+            ./ diego@${{ vars.TAILSCALE_IP }}:/tmp/flight-tracker-deploy/
+
+      - name: Build Docker image on server
+        run: |
+          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} << 'EOF'
+          cd /tmp/flight-tracker-deploy
+          sudo docker build -t flight-tracker:latest .
+          EOF
+
+      - name: Run flight search
+        run: |
+          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} << 'EOF'
+          sudo docker run --rm \
+            -e FLIGHT_ORIGIN="${{ vars.FLIGHT_ORIGIN }}" \
+            -e FLIGHT_DESTINATION="${{ vars.FLIGHT_DESTINATION }}" \
+            -e FLIGHT_TARGET="${{ vars.FLIGHT_TARGET }}" \
+            -e FLIGHT_MARGIN="${{ vars.FLIGHT_MARGIN }}" \
+            -e FLIGHT_OUTBOUND_START="${{ vars.FLIGHT_OUTBOUND_START }}" \
+            -e FLIGHT_OUTBOUND_END="${{ vars.FLIGHT_OUTBOUND_END }}" \
+            -e FLIGHT_RETURN_START="${{ vars.FLIGHT_RETURN_START }}" \
+            -e FLIGHT_RETURN_END="${{ vars.FLIGHT_RETURN_END }}" \
+            -e FLIGHT_PASSENGERS="${{ vars.FLIGHT_PASSENGERS }}" \
+            -e FLIGHT_VERBOSE="${{ vars.FLIGHT_VERBOSE }}" \
+            -e LOG_LEVEL="${{ vars.LOG_LEVEL }}" \
+            -e EMAIL_ENABLED="${{ vars.EMAIL_ENABLED }}" \
+            -e EMAIL_RECIPIENT="${{ vars.EMAIL_RECIPIENT }}" \
+            -e EMAIL_CC="${{ vars.EMAIL_CC }}" \
+            -e EMAIL_SMTP_HOST="${{ vars.EMAIL_SMTP_HOST }}" \
+            -e EMAIL_SMTP_PORT="${{ vars.EMAIL_SMTP_PORT }}" \
+            -e EMAIL_SMTP_USER="${{ vars.EMAIL_SMTP_USER }}" \
+            -e EMAIL_SMTP_PASSWORD="${{ secrets.EMAIL_SMTP_PASSWORD }}" \
+            flight-tracker:latest
+          EOF
+
+      - name: Cleanup
+        if: always()
+        run: |
+          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} << 'EOF'
+          rm -rf /tmp/flight-tracker-deploy
+          sudo docker image prune -f > /dev/null 2>&1 || true
+          EOF
