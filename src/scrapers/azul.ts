@@ -12,6 +12,8 @@ import {
 import { withRetry } from '../utils/retry.ts';
 import { dateRange } from '../utils/dates.ts';
 import { logger } from '../utils/logger.ts';
+import { acceptCookies } from '../browser/cookies.ts';
+import { humanDelay, humanType } from '../browser/human.ts';
 import type { FlightOffer, SearchParams } from '../types/index.ts';
 
 // Aplica o plugin stealth — remove todos os indicadores de automação do browser
@@ -20,20 +22,6 @@ chromium.use(StealthPlugin());
 // ── Azul URLs ─────────────────────────────────────────────────────────────────
 
 const AZUL_HOME = 'https://www.voeazul.com.br/br/pt/home';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Delay aleatório entre min e max ms — simula comportamento humano */
-const humanDelay = (min = 300, max = 900) =>
-  new Promise<void>(r => setTimeout(r, min + Math.random() * (max - min)));
-
-/** Digita texto com velocidade humana (60–120 wpm ≈ 80–160 ms/char) */
-async function humanType(page: Page, locator: ReturnType<Page['locator']>, text: string): Promise<void> {
-  await locator.click({ timeout: 15_000 });
-  await locator.clear().catch(() => {});
-  await humanDelay(200, 400);
-  await locator.pressSequentially(text, { delay: 80 + Math.random() * 80 });
-}
 
 
 export async function searchFlights(params: SearchParams): Promise<FlightOffer[]> {
@@ -116,7 +104,7 @@ async function searchSingleDate(
     await page.goto(AZUL_HOME, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await humanDelay(1_500, 3_000);  // Simula usuário lendo a página inicial
     await checkForBlock(page);
-    await dismissCookieBanner(page);
+    await acceptCookies(page);
     await fillSearchForm(page, origin, destination, date, params.passengers);
     await waitForResults(page, capturedResponses);
 
@@ -143,28 +131,6 @@ async function searchSingleDate(
         .catch(() => {});
     }
     await context.close();
-  }
-}
-
-// ── Cookie / LGPD banner ──────────────────────────────────────────────────────
-
-async function dismissCookieBanner(page: Page): Promise<void> {
-  const banner = page.locator([
-    'button:has-text("Aceitar")',
-    'button:has-text("Aceito")',
-    'button:has-text("Accept")',
-    'button:has-text("Concordo")',
-    '[id*="cookie" i] button',
-    '[class*="cookie" i] button',
-    '[class*="lgpd" i] button',
-    '[data-testid*="cookie" i]',
-  ].join(', ')).first();
-
-  const visible = await banner.isVisible().catch(() => false);
-  if (visible) {
-    await banner.click().catch(() => {});
-    await humanDelay(500, 1_000);
-    logger.debug('Dismissed cookie/LGPD banner');
   }
 }
 
