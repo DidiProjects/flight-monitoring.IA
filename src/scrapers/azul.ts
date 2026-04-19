@@ -1,6 +1,5 @@
-import { chromium } from 'playwright-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import type { Browser, Page, Response } from 'playwright';
+import { chromium } from 'rebrowser-playwright';
+import type { Browser, Page, Response } from 'rebrowser-playwright';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -15,9 +14,6 @@ import { logger } from '../utils/logger.ts';
 import { acceptCookies } from '../browser/cookies.ts';
 import { humanDelay, humanType } from '../browser/human.ts';
 import type { FlightOffer, SearchParams } from '../types/index.ts';
-
-// Aplica o plugin stealth — remove todos os indicadores de automação do browser
-chromium.use(StealthPlugin());
 
 // ── Azul URLs ─────────────────────────────────────────────────────────────────
 

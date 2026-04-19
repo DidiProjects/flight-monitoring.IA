@@ -1,4 +1,4 @@
-import type { Page } from 'playwright';
+import type { Page } from 'rebrowser-playwright';
 
 /**
  * Tenta aceitar/fechar qualquer banner de cookies ou LGPD.

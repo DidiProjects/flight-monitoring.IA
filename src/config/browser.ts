@@ -1,4 +1,4 @@
-import type { BrowserContextOptions, LaunchOptions } from 'playwright';
+import type { BrowserContextOptions, LaunchOptions } from 'rebrowser-playwright';
 
 export const launchOptions: LaunchOptions = {
   headless: true,
@@ -6,10 +6,11 @@ export const launchOptions: LaunchOptions = {
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',   // Usa /tmp em vez de /dev/shm (necessário em Docker)
+    '--disable-dev-shm-usage',
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-extensions',
+    '--disable-blink-features=AutomationControlled',
     '--lang=pt-BR',
     '--window-size=1920,1080',
   ],

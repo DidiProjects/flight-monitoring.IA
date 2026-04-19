@@ -1,4 +1,4 @@
-import type { Page } from 'playwright';
+import type { Page } from 'rebrowser-playwright';
 
 /** Delay aleatório entre min e max ms — simula comportamento humano */
 export const humanDelay = (min = 300, max = 900): Promise<void> =>

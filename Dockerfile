@@ -32,7 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get install -y --no-install-recommends google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# Instala dependências de sistema adicionais exigidas pelo Playwright
-RUN npx playwright install-deps chrome
+# Instala dependências de sistema adicionais exigidas pelo rebrowser-playwright
+RUN npx rebrowser-playwright install-deps chromium
 
 CMD ["npx", "tsx", "src/index.ts"]
