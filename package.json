@@ -9,7 +9,7 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx --watch src/index.ts",
-    "postinstall": "rebrowser-playwright install chromium --with-deps"
+    "postinstall": "npx rebrowser-playwright install chromium --with-deps"
   },
   "dependencies": {
     "chalk": "^5.4.1",
