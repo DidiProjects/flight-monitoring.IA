@@ -1,0 +1,30 @@
+{
+  "name": "flight-api",
+  "version": "1.0.0",
+  "description": "Azul Airlines flight price tracker using Playwright",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx --watch src/index.ts",
+    "postinstall": "playwright install chromium --with-deps"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "cli-table3": "^0.6.5",
+    "commander": "^13.1.0",
+    "ora": "^8.2.0",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "playwright": "^1.52.0"
+  },
+  "devDependencies": {
+    "@tsconfig/node22": "^22.0.0",
+    "@types/cli-table": "^0.3.4",
+    "@types/node": "^22.15.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

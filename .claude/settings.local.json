@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:apify.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:passagens.voeazul.com.br)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:aweirddev.github.io)",
+      "Bash(pip install *)",
+      "Bash(/c/Users/diego/AppData/Local/Python/bin/python3 --version)",
+      "Bash(/c/Users/diego/AppData/Local/Python/bin/python3 -m pip install -r \"c:/Users/diego/Documents/projects/flight.API/requirements.txt\")",
+      "Bash(/c/Users/diego/AppData/Local/Python/bin/python3 main.py --origin VCP --destination GRU --target 500 --outbound-start 2026-05-01)",
+      "Bash(/c/Users/diego/AppData/Local/Python/bin/python3 -c ' *)",
+      "Bash(/c/Users/diego/AppData/Local/Python/bin/python3 -m pip install playwright)",
+      "Bash(/c/Users/diego/AppData/Local/Python/bin/python3 -m playwright install chromium)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}
