@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   flight-tracker:
     build: .
     container_name: flight-tracker
     environment:
       - TZ=America/Sao_Paulo
-
+      - RESULTS_DIR=/data/results
       # ── Parâmetros de busca ──────────────────────────────────
       - FLIGHT_ORIGIN=${FLIGHT_ORIGIN}
       - FLIGHT_DESTINATION=${FLIGHT_DESTINATION}
