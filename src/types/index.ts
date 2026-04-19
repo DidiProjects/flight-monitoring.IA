@@ -9,6 +9,7 @@ export interface SearchParams {
   returnEnd?: string;
   passengers: number;
   verbose: boolean;
+  runDir?: string;   // set by run manager; scrapers write debug files here
 }
 
 export interface FlightOffer {

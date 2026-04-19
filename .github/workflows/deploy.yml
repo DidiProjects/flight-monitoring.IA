@@ -49,6 +49,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} << 'EOF'
           sudo docker run --rm \
+            -v flight-tracker-results:/data/results \
             -e FLIGHT_ORIGIN="${{ vars.FLIGHT_ORIGIN }}" \
             -e FLIGHT_DESTINATION="${{ vars.FLIGHT_DESTINATION }}" \
             -e FLIGHT_TARGET="${{ vars.FLIGHT_TARGET }}" \

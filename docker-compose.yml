@@ -31,3 +31,5 @@ services:
       - EMAIL_SMTP_PORT=${EMAIL_SMTP_PORT:-587}
       - EMAIL_SMTP_USER=${EMAIL_SMTP_USER}
       - EMAIL_SMTP_PASSWORD=${EMAIL_SMTP_PASSWORD}
+    volumes:
+      - ./results:/data/results

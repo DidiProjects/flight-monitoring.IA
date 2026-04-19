@@ -1,4 +1,6 @@
 import { chromium, type Browser, type Page, type Response } from 'playwright';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import {
   launchOptions,
   contextOptions,
@@ -91,6 +93,7 @@ async function searchSingleDate(
     }
   });
 
+  let failed = false;
   try {
     await page.goto(AZUL_HOME, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await checkForBlock(page);
@@ -105,9 +108,19 @@ async function searchSingleDate(
     }
 
     return offers;
+  } catch (err) {
+    failed = true;
+    const errDir = params.runDir ? path.join(params.runDir, 'errors') : process.cwd();
+    await fs.mkdir(errDir, { recursive: true }).catch(() => {});
+    await page
+      .screenshot({ path: path.join(errDir, `debug-${origin}-${destination}-${date}.png`) })
+      .catch(() => {});
+    throw err;
   } finally {
-    if (params.verbose) {
-      await page.screenshot({ path: `debug-${origin}-${destination}-${date}.png` });
+    if (params.verbose && !failed && params.runDir) {
+      await page
+        .screenshot({ path: path.join(params.runDir, `debug-${origin}-${destination}-${date}.png`) })
+        .catch(() => {});
     }
     await context.close();
   }
