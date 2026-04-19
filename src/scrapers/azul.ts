@@ -1,4 +1,6 @@
-import { chromium, type Browser, type Page, type Response } from 'playwright';
+import { chromium } from 'playwright-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import type { Browser, Page, Response } from 'playwright';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -12,11 +14,27 @@ import { dateRange } from '../utils/dates.ts';
 import { logger } from '../utils/logger.ts';
 import type { FlightOffer, SearchParams } from '../types/index.ts';
 
+// Aplica o plugin stealth — remove todos os indicadores de automação do browser
+chromium.use(StealthPlugin());
+
 // ── Azul URLs ─────────────────────────────────────────────────────────────────
 
 const AZUL_HOME = 'https://www.voeazul.com.br/br/pt/home';
 
-// ── Public API ────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Delay aleatório entre min e max ms — simula comportamento humano */
+const humanDelay = (min = 300, max = 900) =>
+  new Promise<void>(r => setTimeout(r, min + Math.random() * (max - min)));
+
+/** Digita texto com velocidade humana (60–120 wpm ≈ 80–160 ms/char) */
+async function humanType(page: Page, locator: ReturnType<Page['locator']>, text: string): Promise<void> {
+  await locator.click({ timeout: 15_000 });
+  await locator.clear().catch(() => {});
+  await humanDelay(200, 400);
+  await locator.pressSequentially(text, { delay: 80 + Math.random() * 80 });
+}
+
 
 export async function searchFlights(params: SearchParams): Promise<FlightOffer[]> {
   const browser = await chromium.launch(launchOptions);
@@ -96,7 +114,9 @@ async function searchSingleDate(
   let failed = false;
   try {
     await page.goto(AZUL_HOME, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+    await humanDelay(1_500, 3_000);  // Simula usuário lendo a página inicial
     await checkForBlock(page);
+    await dismissCookieBanner(page);
     await fillSearchForm(page, origin, destination, date, params.passengers);
     await waitForResults(page, capturedResponses);
 
@@ -123,6 +143,28 @@ async function searchSingleDate(
         .catch(() => {});
     }
     await context.close();
+  }
+}
+
+// ── Cookie / LGPD banner ──────────────────────────────────────────────────────
+
+async function dismissCookieBanner(page: Page): Promise<void> {
+  const banner = page.locator([
+    'button:has-text("Aceitar")',
+    'button:has-text("Aceito")',
+    'button:has-text("Accept")',
+    'button:has-text("Concordo")',
+    '[id*="cookie" i] button',
+    '[class*="cookie" i] button',
+    '[class*="lgpd" i] button',
+    '[data-testid*="cookie" i]',
+  ].join(', ')).first();
+
+  const visible = await banner.isVisible().catch(() => false);
+  if (visible) {
+    await banner.click().catch(() => {});
+    await humanDelay(500, 1_000);
+    logger.debug('Dismissed cookie/LGPD banner');
   }
 }
 
@@ -155,7 +197,6 @@ async function fillSearchForm(
   logger.debug('Filling search form');
 
   // ── Origin field ─────────────────────────────────────────────────────────
-  // Try multiple strategies: ARIA role, aria-label, placeholder, name, data attrs
   const originInput = page
     .getByRole('combobox', { name: /origem|origin/i })
     .or(page.getByLabel(/origem|origin/i).first())
@@ -170,9 +211,8 @@ async function fillSearchForm(
       '[data-testid*="origem" i] input',
     ].join(', ')).first());
 
-  await originInput.click({ timeout: 15_000 });
-  await originInput.fill(origin);
-  await page.waitForTimeout(600);
+  await humanType(page, originInput, origin);
+  await humanDelay(600, 1_200);
   await page
     .locator([
       `[data-testid*="suggestion"]`,
@@ -184,6 +224,8 @@ async function fillSearchForm(
     .first()
     .click({ timeout: 8_000 })
     .catch(() => page.keyboard.press('Enter'));
+
+  await humanDelay(400, 800);
 
   // ── Destination field ────────────────────────────────────────────────────
   const destInput = page
@@ -200,9 +242,8 @@ async function fillSearchForm(
       '[data-testid*="destino" i] input',
     ].join(', ')).first());
 
-  await destInput.click({ timeout: 10_000 });
-  await destInput.fill(destination);
-  await page.waitForTimeout(600);
+  await humanType(page, destInput, destination);
+  await humanDelay(600, 1_200);
   await page
     .locator([
       `[data-testid*="suggestion"]`,
@@ -214,6 +255,8 @@ async function fillSearchForm(
     .first()
     .click({ timeout: 8_000 })
     .catch(() => page.keyboard.press('Enter'));
+
+  await humanDelay(400, 800);
 
   // ── Date field ───────────────────────────────────────────────────────────
   const [year, month, day] = date.split('-').map(Number) as [number, number, number];

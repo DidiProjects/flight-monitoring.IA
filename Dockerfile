@@ -20,8 +20,19 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json tsconfig.json ./
 COPY src/ ./src/
 
-# Install Chromium + all system dependencies required by Playwright
-RUN npx playwright install --with-deps chromium \
+# Instala Google Chrome Stable (fingerprint TLS idêntico ao de um usuário real)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget gnupg ca-certificates \
+    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub \
+       | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] \
+       http://dl.google.com/linux/chrome/deb/ stable main" \
+       > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
+
+# Instala dependências de sistema adicionais exigidas pelo Playwright
+RUN npx playwright install-deps chrome
 
 CMD ["npx", "tsx", "src/index.ts"]
