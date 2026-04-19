@@ -97,10 +97,23 @@ async function searchSingleDate(
 
   let failed = false;
   try {
-    await page.goto(AZUL_HOME, { waitUntil: 'domcontentloaded', timeout: 45_000 });
-    await humanDelay(1_500, 3_000);  // Simula usuário lendo a página inicial
+    await page.goto(AZUL_HOME, { waitUntil: 'load', timeout: 60_000 });
+    // Wait for React to finish rendering the search form (networkidle = no pending XHR)
+    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+    await humanDelay(1_500, 2_500);
     await checkForBlock(page);
     await acceptCookies(page);
+
+    // Ensure OneTrust overlay is gone before interacting with the form
+    await page.evaluate(() => {
+      const el = document.querySelector('#onetrust-consent-sdk') as HTMLElement | null;
+      if (el) el.style.display = 'none';
+      const filter = document.querySelector('.onetrust-pc-dark-filter') as HTMLElement | null;
+      if (filter) filter.style.display = 'none';
+    }).catch(() => {});
+    await page.waitForTimeout(800);
+    await waitForSearchForm(page);
+
     await fillSearchForm(page, origin, destination, date, params.passengers);
     await waitForResults(page, capturedResponses);
 
@@ -116,8 +129,12 @@ async function searchSingleDate(
     failed = true;
     const errDir = params.runDir ? path.join(params.runDir, 'errors') : process.cwd();
     await fs.mkdir(errDir, { recursive: true }).catch(() => {});
+    const base = `${origin}-${destination}-${date}`;
     await page
-      .screenshot({ path: path.join(errDir, `debug-${origin}-${destination}-${date}.png`) })
+      .screenshot({ path: path.join(errDir, `debug-${base}.png`), fullPage: true })
+      .catch(() => {});
+    await page.evaluate(() => document.documentElement.outerHTML)
+      .then(html => fs.writeFile(path.join(errDir, `dom-${base}.html`), html))
       .catch(() => {});
     throw err;
   } finally {
@@ -147,6 +164,56 @@ async function checkForBlock(page: Page): Promise<void> {
   }
 }
 
+// ── Wait for search form ──────────────────────────────────────────────────────
+
+async function waitForSearchForm(page: Page): Promise<void> {
+  // Wait for the Origem input to be attached to DOM (it may be opacity:0 — not "visible" per Playwright)
+  try {
+    await page
+      .locator('input[aria-label*="Origem" i]')
+      .first()
+      .waitFor({ state: 'attached', timeout: 20_000 });
+    logger.debug('Search form is attached to DOM');
+  } catch {
+    logger.warn('Search form attach timeout — proceeding anyway');
+  }
+}
+
+// ── Native focus helper ───────────────────────────────────────────────────────
+
+async function nativeFocusInput(page: Page, selector: string): Promise<void> {
+  // Try using real mouse coordinates first (most reliable for opening dropdowns/calendars)
+  const coords = await page.evaluate((sel) => {
+    // Click the parent label/container that's visually shown (not the hidden input itself)
+    const input = document.querySelector(sel) as HTMLElement | null;
+    if (!input) return null;
+    const container = input.closest('label') ?? input.parentElement ?? input;
+    container.scrollIntoView({ block: 'center', behavior: 'instant' });
+    const r = container.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) {
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }
+    return null;
+  }, selector);
+
+  if (coords && coords.y > 0 && coords.y < 1080) {
+    await page.mouse.click(coords.x, coords.y);
+  } else {
+    // Fallback: synthetic DOM events if element is off-screen
+    await page.evaluate((sel) => {
+      const el = document.querySelector(sel) as HTMLInputElement | null;
+      if (!el) return;
+      el.focus();
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    }, selector);
+  }
+  // Always explicitly focus the INPUT (not the container) to receive keyboard events
+  await page.evaluate((sel) => {
+    const el = document.querySelector(sel) as HTMLInputElement | null;
+    if (el) el.focus();
+  }, selector);
+}
+
 // ── Form filling ──────────────────────────────────────────────────────────────
 
 async function fillSearchForm(
@@ -159,84 +226,41 @@ async function fillSearchForm(
   logger.debug('Filling search form');
 
   // ── Origin field ─────────────────────────────────────────────────────────
-  const originInput = page
-    .getByRole('combobox', { name: /origem|origin/i })
-    .or(page.getByLabel(/origem|origin/i).first())
-    .or(page.locator([
-      'input[aria-label*="Origem" i]',
-      'input[placeholder*="Origem" i]',
-      'input[placeholder*="origin" i]',
-      'input[name="origin"]',
-      'input[name="ORIGIN"]',
-      '[data-id="origin"] input',
-      '[data-testid*="origin" i] input',
-      '[data-testid*="origem" i] input',
-    ].join(', ')).first());
-
-  await humanType(page, originInput, origin);
+  // Azul uses styled-components with opacity:0 floating labels. We use native
+  // JS focus to interact with the input regardless of CSS visibility/position.
+  await nativeFocusInput(page, 'input[aria-label*="Origem" i]');
+  await humanDelay(300, 500);
+  await page.keyboard.type(origin, { delay: 80 + Math.random() * 80 });
   await humanDelay(600, 1_200);
-  await page
-    .locator([
-      `[data-testid*="suggestion"]`,
-      `li:has-text("${origin}")`,
-      `[role="option"]:has-text("${origin}")`,
-      `[class*="suggestion"]:has-text("${origin}")`,
-      `[class*="autocomplete"] li:has-text("${origin}")`,
-    ].join(', '))
-    .first()
-    .click({ timeout: 8_000 })
-    .catch(() => page.keyboard.press('Enter'));
+  // Use native events for autocomplete selection (bypasses any overlay)
+  const originSelected = await page.evaluate((query) => {
+    const options = Array.from(document.querySelectorAll('[role="option"], [role="listbox"] li, [class*="suggestion"] li, [class*="autocomplete"] li'));
+    const opt = options.find(o => o.textContent?.includes(query)) as HTMLElement | null;
+    if (opt) { opt.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); opt.click(); return true; }
+    return false;
+  }, origin);
+  if (!originSelected) await page.keyboard.press('Enter');
 
-  await humanDelay(400, 800);
+  await humanDelay(600, 1_000);
 
   // ── Destination field ────────────────────────────────────────────────────
-  const destInput = page
-    .getByRole('combobox', { name: /destino|destination/i })
-    .or(page.getByLabel(/destino|destination/i).first())
-    .or(page.locator([
-      'input[aria-label*="Destino" i]',
-      'input[placeholder*="Destino" i]',
-      'input[placeholder*="destination" i]',
-      'input[name="destination"]',
-      'input[name="DESTINATION"]',
-      '[data-id="destination"] input',
-      '[data-testid*="destination" i] input',
-      '[data-testid*="destino" i] input',
-    ].join(', ')).first());
-
-  await humanType(page, destInput, destination);
+  await nativeFocusInput(page, 'input[aria-label*="Destino" i]');
+  await humanDelay(300, 500);
+  await page.keyboard.type(destination, { delay: 80 + Math.random() * 80 });
   await humanDelay(600, 1_200);
-  await page
-    .locator([
-      `[data-testid*="suggestion"]`,
-      `li:has-text("${destination}")`,
-      `[role="option"]:has-text("${destination}")`,
-      `[class*="suggestion"]:has-text("${destination}")`,
-      `[class*="autocomplete"] li:has-text("${destination}")`,
-    ].join(', '))
-    .first()
-    .click({ timeout: 8_000 })
-    .catch(() => page.keyboard.press('Enter'));
+  const destSelected = await page.evaluate((query) => {
+    const options = Array.from(document.querySelectorAll('[role="option"], [role="listbox"] li, [class*="suggestion"] li, [class*="autocomplete"] li'));
+    const opt = options.find(o => o.textContent?.includes(query)) as HTMLElement | null;
+    if (opt) { opt.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); opt.click(); return true; }
+    return false;
+  }, destination);
+  if (!destSelected) await page.keyboard.press('Enter');
 
   await humanDelay(400, 800);
 
   // ── Date field ───────────────────────────────────────────────────────────
   const [year, month, day] = date.split('-').map(Number) as [number, number, number];
-  const dateInput = page
-    .getByRole('textbox', { name: /data de ida|outbound|departure date|ida/i })
-    .or(page.getByLabel(/data de ida|ida|outbound|departure/i).first())
-    .or(page.locator([
-      'input[type="date"]',
-      '[data-id="date"] input',
-      '[data-testid*="date" i] input',
-      '[name*="date"]',
-      '[name*="Data"]',
-    ].join(', ')).first());
-
-  await dateInput.click({ timeout: 10_000 });
-
-  // Navigate calendar to the correct month if a date-picker is shown
-  await navigateCalendar(page, year, month, day);
+  await openAndFillCalendar(page, year, month, day);
 
   // ── Passengers ───────────────────────────────────────────────────────────
   if (passengers > 1) {
@@ -245,35 +269,189 @@ async function fillSearchForm(
 
   // ── Submit ───────────────────────────────────────────────────────────────
   await page
-    .getByRole('button', { name: /buscar|search|ver voos|pesquisar/i })
-    .or(page.locator('[data-testid*="search" i] button, button[type="submit"]').first())
+    .locator('button[data-cy*="search" i], button[data-cy*="buscar" i]')
+    .or(page.getByRole('button', { name: /^buscar$|^search$|^ver voos$/i }))
+    .first()
     .click({ timeout: 10_000 });
 }
 
-async function navigateCalendar(page: Page, year: number, month: number, day: number): Promise<void> {
-  // If a native date input is available, fill directly
-  const nativeDate = page.locator('input[type="date"]').first();
-  if (await nativeDate.count() > 0) {
-    await nativeDate.fill(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+async function openAndFillCalendar(page: Page, year: number, month: number, day: number): Promise<void> {
+  const DATE_SELECTOR = 'input[aria-label*="Data de ida" i], input[aria-label*="Datas" i], input[aria-label*="date" i]';
+
+  // ── Step 1: open the calendar picker ────────────────────────────────────────
+  const calendarOpen = async (): Promise<boolean> => {
+    return page.waitForFunction(
+      () => {
+        const btns = Array.from(document.querySelectorAll<HTMLElement>('button'));
+        if (btns.some(b => /selecionar data|confirmar/i.test(b.textContent ?? ''))) return true;
+        if (document.querySelector('[role="grid"],[role="dialog"],[class*="DayPicker"],[class*="datepick"],[class*="calendar" i]')) return true;
+        return false;
+      },
+      { timeout: 5_000 },
+    ).then(() => true).catch(() => false);
+  };
+
+  // Click the visible date container with real mouse coords
+  const clickDateField = async (): Promise<void> => {
+    const coords = await page.evaluate((sel) => {
+      const input = document.querySelector<HTMLElement>(sel);
+      if (!input) return null;
+      // Walk up to find a reasonably-sized clickable ancestor
+      let el: HTMLElement | null = input;
+      for (let i = 0; i < 5; i++) {
+        const r = el.getBoundingClientRect();
+        if (r.width >= 40 && r.height >= 20) {
+          el.scrollIntoView({ block: 'center', behavior: 'instant' });
+          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        }
+        el = el.parentElement;
+        if (!el) break;
+      }
+      // Absolute fallback: focus the input
+      input.focus();
+      return null;
+    }, DATE_SELECTOR);
+
+    if (coords) {
+      await page.mouse.click(coords.x, coords.y);
+    } else {
+      await page.evaluate((sel) => {
+        const el = document.querySelector<HTMLElement>(sel);
+        if (el) { el.focus(); el.click(); }
+      }, DATE_SELECTOR);
+    }
+  };
+
+  await clickDateField();
+  await humanDelay(600, 900);
+
+  let visible = await calendarOpen();
+
+  if (!visible) {
+    // Some Azul variants need a Space/Enter key press to open the picker
+    await page.keyboard.press('Space');
+    await humanDelay(400, 600);
+    visible = await calendarOpen();
+  }
+
+  if (!visible) {
+    // Look for a calendar-icon button adjacent to the input and click it
+    const iconClicked = await page.evaluate((sel) => {
+      const input = document.querySelector<HTMLElement>(sel);
+      if (!input) return false;
+      const parent = input.closest('[class]') ?? input.parentElement;
+      if (!parent) return false;
+      // Find sibling button with SVG (calendar icon)
+      const iconBtn = parent.parentElement?.querySelector<HTMLElement>('button svg')?.closest('button');
+      if (iconBtn) { (iconBtn as HTMLElement).click(); return true; }
+      return false;
+    }, DATE_SELECTOR);
+
+    if (iconClicked) {
+      await humanDelay(500, 800);
+      visible = await calendarOpen();
+    }
+  }
+
+  if (!visible) {
+    // Last resort: type date in dd/mm/yyyy format directly into the input
+    const formatted = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+    logger.warn({ year, month, day, formatted }, 'Calendar did not open — typing date directly');
+    await page.evaluate((sel) => {
+      const el = document.querySelector<HTMLInputElement>(sel);
+      if (el) { el.focus(); el.select(); }
+    }, DATE_SELECTOR);
+    await page.keyboard.type(formatted, { delay: 120 });
+    await page.keyboard.press('Tab');
     return;
   }
 
-  // Otherwise interact with a calendar widget
-  const target = new Date(year, month - 1, day);
-  for (let i = 0; i < 12; i++) {
-    const dayCell = page.locator(`[aria-label*="${day}"]`).or(
-      page.locator(`td:has-text("${day}"):not(:has-text("${day + 1}"))`).first(),
-    );
-    if (await dayCell.isVisible().catch(() => false)) {
-      await dayCell.click();
-      return;
+  logger.debug({ year, month, day }, 'Calendar picker opened');
+
+  // ── Step 2: navigate to the correct month ────────────────────────────────────
+  const MONTHS_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const targetMonthPt = MONTHS_PT[month - 1]!;
+
+  for (let attempt = 0; attempt < 14; attempt++) {
+    const shownMonth = await page.evaluate((target) => {
+      const all = Array.from(document.querySelectorAll('*'));
+      return all.some(el => {
+        const text = (el.children.length === 0 ? el.textContent ?? '' : '').toLowerCase();
+        return text.includes(target.toLowerCase());
+      });
+    }, targetMonthPt);
+
+    if (shownMonth) {
+      // ── Step 3: click the day ──────────────────────────────────────────────
+      const clicked = await page.evaluate((d) => {
+        // Anchor search on "Selecionar data" button — walk up to find the calendar root
+        const confirmBtn = Array.from(document.querySelectorAll<HTMLElement>('button'))
+          .find(b => /selecionar data|confirmar/i.test(b.textContent ?? ''));
+        let root: HTMLElement = confirmBtn ? confirmBtn : document.body;
+        for (let i = 0; i < 8 && root.parentElement; i++) root = root.parentElement as HTMLElement;
+
+        const dayBtns = Array.from(root.querySelectorAll<HTMLElement>('button:not([disabled])'));
+        for (const btn of dayBtns) {
+          // Match a button whose ONLY numeric text content equals the day number
+          const text = btn.textContent?.trim() ?? '';
+          if (text === String(d) || btn.querySelector('span')?.textContent?.trim() === String(d)) {
+            btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+            btn.dispatchEvent(new MouseEvent('mouseup',   { bubbles: true }));
+            btn.click();
+            return true;
+          }
+        }
+        return false;
+      }, day);
+
+      if (clicked) {
+        await page.waitForTimeout(400);
+        // Confirm with "Selecionar data" button if present
+        await page.evaluate(() => {
+          const btn = Array.from(document.querySelectorAll<HTMLElement>('button'))
+            .find(b => /selecionar data|confirmar/i.test(b.textContent ?? ''));
+          if (btn) btn.click();
+        });
+        logger.debug({ year, month, day }, 'Calendar day selected');
+        await humanDelay(300, 500);
+        return;
+      }
     }
-    // Advance calendar one month
-    await page.getByRole('button', { name: /next|próximo|>/i }).first().click();
-    await page.waitForTimeout(400);
+
+    // Advance to next month
+    const advanced = await page.evaluate(() => {
+      const allBtns = Array.from(document.querySelectorAll<HTMLElement>('button'));
+      const nextBtn = allBtns.find(b => {
+        const label = b.getAttribute('aria-label') ?? '';
+        const text = b.textContent?.trim() ?? '';
+        return (
+          (/next|próximo|avançar/i.test(label) || text === '>' || text === '›') &&
+          !b.hasAttribute('disabled')
+        ) || (
+          b.querySelector('svg') !== null &&
+          text === '' &&
+          !b.hasAttribute('disabled') &&
+          // Ensure it's not a day button
+          !b.closest('[role="gridcell"]')
+        );
+      });
+      if (nextBtn) { nextBtn.click(); return true; }
+      // Fallback: last enabled SVG-only button (right-arrow)
+      const svgBtns = allBtns.filter(b =>
+        b.querySelector('svg') && b.textContent?.trim() === '' && !b.hasAttribute('disabled')
+      );
+      if (svgBtns.length > 0) { svgBtns[svgBtns.length - 1]!.click(); return true; }
+      return false;
+    });
+
+    if (!advanced) {
+      logger.warn({ year, month, day }, 'Cannot advance calendar month');
+      break;
+    }
+    await page.waitForTimeout(600);
   }
 
-  logger.warn({ year, month, day }, 'Could not navigate calendar — pressing Enter on date input');
+  logger.warn({ year, month, day }, 'Calendar navigation failed — pressing Enter as fallback');
   await page.keyboard.press('Enter');
 }
 

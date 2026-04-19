@@ -13,6 +13,7 @@ export async function humanType(
   locator: ReturnType<Page['locator']>,
   text: string,
 ): Promise<void> {
+  await locator.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
   await locator.click({ timeout: 15_000 });
   await locator.clear().catch(() => {});
   await humanDelay(200, 400);
