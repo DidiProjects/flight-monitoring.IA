@@ -1,41 +1,35 @@
-API para acompanhar valor de passagens aérias;
-
-Vamos utilizar python, quero criar um script para cada cada impresa aéria, por enquanto vamos considerar apenas azul;
-Quero que esse script consuma apis da azul para encontrar passagens aérias pra mim.
-
-Entradas:
-  target: Valor inteiro;
-  currency: pode reser especificação da moeda ou pontos (para milhas), campo obrigatório e por default será Real;
-  margem: será a percentagem de tolerância, em que eu devo ser avisado sobre a passagem: default 0,1;
-  ida: {
-    dataInicio: YYYY-MM-DD: campo obrigatório, define o início do período de interece para acompanhar as passagens,
-    dataFim: YYYY-MM-DD campo não obrigatório, define o fim do período de interece para acompanhar as passagens,
-  }
-  volta: {
-    dataInicio: YYYY-MM-DD: campo obrigatório, define o início do período de interece para acompanhar as passagens,
-    dataFim: YYYY-MM-DD campo não obrigatório, define o fim do período de interece para acompanhar as passagens,
-  }
-  o campo de volta será não obrigatório, dando a possibilidade de pesquisar apenas uma viagem;
-
-Saídas, quero a relação de valores das passagens de acordo com a currency especificada e com o período especificado;
-
-Quero que minhas consultas tenham retry para casos de erro.
-Inicialmente quero ver meus resultados no terminal.
-Quero seguir as melhores práticas do mercado, utilizar tecnologias de ponta gratuítas.
-Quero todo o desenvolvimento em inglês.
-
-
 Novas instruções:
 
-procurar por um spam com texto: "Datas (Ida e volta)";
-clicar nele;
-procurar input com aria-label: "Data de ida"
-digitar a data no formato Brasileiro, apenas númveros (exmplo pro dia 11/15/1993 seria 11151993 digitado!)
-procurar input com aria-label: "Data de volta (opcional)" se necessário
-digitar a data no formato Brasileiro, apenas númveros (exmplo pro dia 11/15/1993 seria 11151993 digitado!)
-clique no botão que contém o texto: "Selecionar datas de ida e volta"
+procurar pelo elemento:
+<input placeholder="Digite" role="combobox" aria-expanded="false" aria-label="Origem" aria-autocomplete="none" autocomplete="off" data-cy="autocomplete-desktop-input" id=":r3:" title="" required="" class="sc-hIUJlX hXJaFA" value="">
 
-clique no botão que contém o texto: "Buscar passagens"
+clicar nele e digitar e digitar o código do aeroporto
+
+após digitar o código deve ser encontrado em uma das opções, mo meu exemplo o código é o "LIS":
+
+<button type="button" role="option" aria-selected="false" tabindex="-1" data-cy="autocomplete-options-item-2" class="sc-brPLxw bJuQVm"><div class="sc-iMWBiJ cqQfaE"><b class="sc-fvtFIe ievJRl">LIS</b><div class="sc-bBeLUv bekRhU"><span class="sc-ihgnxF jkqciY">Lisboa</span></div></div></button>
+
+encontrado o button que contém o código vamos clicar nele
+
+para selecionar o destino faremos a mesma coisa:
+
+<input placeholder="Digite" role="combobox" aria-expanded="false" aria-label="Destino" aria-autocomplete="none" autocomplete="off" data-cy="autocomplete-desktop-input" id=":r4:" title="" required="" class="sc-hIUJlX hXJaFA" value="">
+
+<button type="button" role="option" aria-selected="false" tabindex="-1" data-cy="autocomplete-options-item-2" class="sc-brPLxw bJuQVm"><div class="sc-iMWBiJ cqQfaE"><b class="sc-fvtFIe ievJRl">PLU</b><div class="sc-bBeLUv bekRhU"><span class="sc-ihgnxF jkqciY">Belo Horizonte - Pampulha</span></div></div></button>
+
+selecionados a origem e destino, vamos para data:
+
+
+temos como entrada um range de datas e voos de ida e volta, porém em nossa pesquisa vamos considerar apenas voos de ída, dessa forma vamos procurar e clicar no campo:
+
+<input placeholder="Selecione" id=":r8:" aria-label="Datas (Ida e volta)" aria-autocomplete="none" title="" required="" class="sc-hIUJlX hXJaFA" value="">
+
+digitar a data no formato Brasileiro, apenas númveros (exmplo pro dia 11/15/1993 seria 11151993 digitado!)
+
+
+clique no botão que contém o texto: "Buscar passagens":
+
+<button type="button" class="sc-eqUAAy iNxtop sc-lnrzcU iouhCu sc-gEvEer iSglkT">Buscar passagens</button>
 
 após vamos te rum estado de loading, que vai se encerrar quando encontrarmos um:
 <p class="results">10 voos encontrados</p>
@@ -67,12 +61,14 @@ mudanças de todas:
 
   vamos realizar pesquisa de preço para ida e volta separadamente, primeira a de ída como passagem sem volta, depois a de volta como passagem sem volta. dessa forma não vamos utilizar o campo Data de volta (opcional) por enquanto,
 
+  Vamos mudar os campos de entrada: 
+  
   target: Valor inteiro;
   currency: pode reser especificação da moeda ou pontos (para milhas), campo obrigatório e por default será Real;
 
-  vamos manter esses parâmetros mas não mais precisaremos especificar pontos, apenas moeda, isso pois para todas as pesquisas vamos devolver valor em real (no caso da azul) em pontos e híbrido pontos e real.
+  vamos manter esses parâmetros mas não mais precisamos especificar pontos, apenas moeda, isso pois para todas as pesquisas vamos devolver valor em real (no caso da azul) em pontos e híbrido pontos e real.
 
-  Como pela azul temos opções de navegar entre diferentes datas, vamos explorar após a pesquisa inicial (selecionando no datapicker o começo do período de interesse para a ída e o fim do período de interesse para a volta) as demais datas de interesse, uma por uma e armazenando os resultados, através do booking-calendar.
+  Como pela azul temos opções de navegar entre diferentes datas, vamos explorar após a pesquisa inicial (selecionando no datapicker o começo do período de interesse para a ída e o fim do período de interesse para a volta) as demais datas de interesse, uma por uma e armazenando os resultados, através do booking-calendar. Muita atenção nesse ajuste, temos como entrada um range de datas de ida e um range para a volta, eu quero pequisar as datas limites e pela tela ir navegando nas demais opções. se meu range de ída é: (2026-05-25 e 2026-05-27), eu vou pesquisar 2026-05-25 e vou navegar até a data "qui 27/05" armazenando os resultados. ao pesquisar o voo de volta seria exatamente a mesma coisa.
 
   após coletar todos os dados da passagem de ída, devemos prosseguir para data de volta, para tanto vamos refazer a pesquisa, considerando a passágem de volta como ida.
 

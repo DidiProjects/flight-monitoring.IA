@@ -1,35 +1,5 @@
 {
   "permissions": {
-    "allow": [
-      "Read",
-      "Edit",
-      "Write",
-      "Glob",
-      "Grep",
-      "WebFetch", 
-      "MultiEdit",
-      "Bash(npm:*)",
-      "Bash(npx:*)",
-      "Bash(node:*)",
-      "Bash(tsx:*)",
-      "Bash(tsc:*)",
-      "Bash(git status)",
-      "Bash(git status:*)",
-      "Bash(git diff:*)",
-      "Bash(git log:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git branch:*)",
-      "Bash(git checkout:*)",
-      "Bash(git stash:*)",
-      "Bash(git restore:*)",
-      "Bash(git reset:*)"
-    ],
-    "deny": [
-      "Bash(git push:*)",
-      "Bash(git push)",
-      "Bash(rm -rf:*)",
-      "Bash(rmdir:*)"
-    ]
+    "defaultMode": "bypassPermissions"
   }
 }
