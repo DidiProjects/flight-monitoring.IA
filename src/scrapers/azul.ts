@@ -427,36 +427,38 @@ async function collectFlights(
   date: string,
 ): Promise<FlightOffer[]> {
   // Walk the DOM looking for elements that contain both time patterns and price/points content
+  // Uses iterative stack to avoid named functions inside evaluate (tsx __name issue)
   const rawCards = await page.evaluate(() => {
     const results: Array<{ html: string; text: string }> = [];
     const seen = new Set<string>();
+    const root = document.querySelector('main') ?? document.body;
+    const stack: Array<[Element, number]> = [[root, 0]];
 
-    function walk(el: Element, depth: number): void {
-      if (depth > 12) return;
+    while (stack.length > 0) {
+      const item = stack.pop()!;
+      const el = item[0];
+      const depth = item[1];
+      if (depth > 12) continue;
       const childCount = el.children.length;
-      if (childCount > 40) {
-        for (const child of Array.from(el.children)) walk(child, depth + 1);
-        return;
-      }
       const text = (el as HTMLElement).innerText ?? el.textContent ?? '';
       const hasTime = /\b\d{2}:\d{2}\b/.test(text);
       const hasPrice = /R\$|pontos|\d{3,}/i.test(text);
-      if (hasTime && hasPrice && childCount >= 2) {
+      if (hasTime && hasPrice && childCount >= 2 && childCount <= 40) {
         const html = (el as HTMLElement).outerHTML;
         if (html.length > 80 && html.length < 12_000) {
           const key = text.slice(0, 120).replace(/\s+/g, ' ');
           if (!seen.has(key)) {
             seen.add(key);
             results.push({ html, text: text.replace(/\s+/g, ' ').trim() });
-            return; // Don't recurse into a matched card
+            continue; // Don't recurse into a matched card
           }
         }
       }
-      for (const child of Array.from(el.children)) walk(child, depth + 1);
+      for (let i = el.children.length - 1; i >= 0; i--) {
+        stack.push([el.children[i]!, depth + 1]);
+      }
     }
 
-    const root = document.querySelector('main') ?? document.body;
-    walk(root, 0);
     return results.slice(0, 40);
   });
 
