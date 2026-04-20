@@ -15,7 +15,8 @@
       "Bash(/c/Users/diego/AppData/Local/Python/bin/python3 -c ' *)",
       "Bash(/c/Users/diego/AppData/Local/Python/bin/python3 -m pip install playwright)",
       "Bash(/c/Users/diego/AppData/Local/Python/bin/python3 -m playwright install chromium)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(npm start *)"
     ]
   }
 }
