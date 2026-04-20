@@ -1,7 +1,7 @@
 import type { BrowserContextOptions, LaunchOptions } from 'rebrowser-playwright';
 
 export const launchOptions: LaunchOptions = {
-  headless: true,
+  headless: false,
   channel: 'chrome',   // Real Chrome — TLS/JA3 fingerprint idêntico ao de um usuário comum
   args: [
     '--no-sandbox',
