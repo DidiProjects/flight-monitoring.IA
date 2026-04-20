@@ -18,7 +18,17 @@
       "Bash(npx tsc *)",
       "Bash(npm start *)",
       "Bash(docker compose *)",
-      "Bash(docker exec *)"
+      "Bash(docker exec *)",
+      "Bash(powershell -Command \"\\(Get-Item 'C:\\\\Program Files\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe'\\).VersionInfo.FileVersion\")",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:deepwiki.com)",
+      "Bash(npm install *)",
+      "Bash(grep -o 'R\\\\$[^<\"]*\\\\|[0-9][0-9.]*\\\\s*pontos\\\\|[0-9][0-9.]*\\\\s*pts' \"results/2026-04-20T22-19-55/snapshots/LIS-CNF-2026-05-29-results.html\")",
+      "Bash(python3 -c \" import json, sys d = json.load\\(sys.stdin\\) for item in d: if isinstance\\(item, dict\\): prop = item.get\\('property',''\\) if any\\(x in prop.lower\\(\\) for x in ['canvas','noise','resist','finger','privacy']\\): print\\(prop\\) \")",
+      "Bash(python3 -c ' *)",
+      "Read(//c/Users/Diego/.local/share/**)",
+      "Bash(find /root -name \"camoufox*\" -maxdepth 6)"
     ]
   }
 }

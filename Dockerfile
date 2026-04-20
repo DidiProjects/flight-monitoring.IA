@@ -1,43 +1,31 @@
-# ─── Build stage ──────────────────────────────────────────────────────────────
-FROM node:22-bookworm-slim AS deps
+# ─── Base: Ubuntu 24.04 LTS + Node.js 22 ──────────────────────────────────────
+FROM ubuntu:24.04
 
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
-
-# ─── Runtime ──────────────────────────────────────────────────────────────────
-FROM node:22-bookworm-slim
-
+ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Sao_Paulo
 ENV NODE_ENV=production
 ENV LOG_PRETTY=false
-ENV DEBIAN_FRONTEND=noninteractive
-ENV DISPLAY=:99
 
 WORKDIR /app
 
-# Copy dependencies
-COPY --from=deps /app/node_modules ./node_modules
+# Node.js 22 + dependências do Firefox (Camoufox headless não precisa de Xvfb)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl gnupg ca-certificates \
+    libgtk-3-0 libdbus-glib-1-2 libx11-xcb1 libxt6 \
+    libasound2t64 libxcomposite1 libxdamage1 libxrandr2 \
+    libgbm1 libxkbcommon0 libpango-1.0-0 libpangocairo-1.0-0 \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Dependências do app + Camoufox Firefox binary (via postinstall)
 COPY package*.json tsconfig.json ./
+RUN npm ci --omit=dev
+
 COPY src/ ./src/
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-
-# Instala Google Chrome Stable (fingerprint TLS idêntico ao de um usuário real)
-# + Xvfb para display virtual (permite headless:false em container sem GPU)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget gnupg ca-certificates xvfb \
-    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub \
-       | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] \
-       http://dl.google.com/linux/chrome/deb/ stable main" \
-       > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/* \
+RUN sed -i 's/\r//' /usr/local/bin/docker-entrypoint.sh \
     && chmod +x /usr/local/bin/docker-entrypoint.sh
-
-# Instala dependências de sistema adicionais exigidas pelo rebrowser-playwright
-RUN npx rebrowser-playwright install-deps chromium
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["/app/node_modules/.bin/tsx", "src/index.ts"]

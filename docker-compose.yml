@@ -17,9 +17,6 @@ services:
       - FLIGHT_PASSENGERS=${FLIGHT_PASSENGERS:-1}
       - FLIGHT_VERBOSE=${FLIGHT_VERBOSE:-false}
 
-      # ── rebrowser-playwright stealth ─────────────────────────
-      - REBROWSER_PATCHES_RUNTIME_FIX_MODE=alwaysIsolated
-
       # ── Logger ───────────────────────────────────────────────
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - LOG_PRETTY=${LOG_PRETTY:-false}

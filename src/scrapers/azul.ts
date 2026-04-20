@@ -1,9 +1,9 @@
-import { chromium } from 'rebrowser-playwright';
-import type { Browser, Page } from 'rebrowser-playwright';
+import { firefox } from 'playwright';
+import type { Browser, Page } from 'playwright';
+import { launchOptions as camoufoxLaunchOptions } from 'camoufox-js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
-  launchOptions,
   contextOptions,
   BLOCKED_RESOURCES,
 } from '../config/browser.ts';
@@ -18,7 +18,13 @@ const AZUL_HOME = 'https://www.voeazul.com.br/br/pt/home';
 // ── Main entry ────────────────────────────────────────────────────────────────
 
 export async function searchFlights(params: SearchParams): Promise<FlightOffer[]> {
-  const browser = await chromium.launch(launchOptions);
+  const foxOptions = await camoufoxLaunchOptions({
+    headless: true,
+    os: 'windows',
+    locale: 'pt-BR',
+    humanize: true,
+  });
+  const browser = await firefox.launch(foxOptions);
   const results: FlightOffer[] = [];
 
   try {

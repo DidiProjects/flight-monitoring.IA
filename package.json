@@ -9,9 +9,10 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx --watch src/index.ts",
-    "postinstall": "npx rebrowser-playwright install chromium --with-deps"
+    "postinstall": "npx camoufox-js fetch"
   },
   "dependencies": {
+    "camoufox-js": "^0.10.2",
     "chalk": "^5.4.1",
     "cli-table3": "^0.6.5",
     "commander": "^13.1.0",

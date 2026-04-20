@@ -72,3 +72,5 @@ mudanças de todas:
 
   após coletar todos os dados da passagem de ída, devemos prosseguir para data de volta, para tanto vamos refazer a pesquisa, considerando a passágem de volta como ida.
 
+
+tentar solução playwright-camoufox
