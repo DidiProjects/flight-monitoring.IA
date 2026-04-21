@@ -1,5 +1,15 @@
 # flight.API — Instruções para Claude
 
+## Arquitetura atual (2026-04-21)
+
+- **Sem Docker** — scraper roda direto com Node.js 22 no servidor via SSH
+- **Deploy:** GitHub Actions → rsync → `npm ci` → `npm start`
+- **AI Fallback:** quando `npm start` falha com erro real (não consulta vazia) →
+  GHA executa `npm run ai-fix` → `src/agent.ts` usa Claude API (claude-sonnet-4-6)
+  para diagnosticar, corrigir `azul.ts`, retestar e commitar automaticamente
+- **Secret necessário no GHA:** `ANTHROPIC_API_KEY`
+- **Servidor:** precisa de git configurado com push access ao repo
+
 ## Início de cada sessão
 
 1. Ler `memory/MEMORY.md` (índice da memória persistente)

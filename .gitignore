@@ -3,3 +3,4 @@
 /results
 debug-*.png
 scripts/
+.env.example

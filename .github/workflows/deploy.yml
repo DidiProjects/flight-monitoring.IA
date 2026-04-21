@@ -24,57 +24,77 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Transfer files to server
+      - name: Sync project to server
         run: |
           ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} \
-            "mkdir -p /tmp/flight-tracker-deploy"
+            "mkdir -p /home/diego/flight-tracker"
 
-          rsync -az --delete \
+          rsync -az \
             -e "ssh -o StrictHostKeyChecking=no -p 1024" \
             --exclude='.git' \
             --exclude='node_modules' \
             --exclude='.env' \
+            --exclude='results/' \
             --exclude='debug-*.png' \
-            --exclude='scripts/' \
-            ./ diego@${{ vars.TAILSCALE_IP }}:/tmp/flight-tracker-deploy/
+            ./ diego@${{ vars.TAILSCALE_IP }}:/home/diego/flight-tracker/
 
-      - name: Build Docker image on server
+      - name: Install dependencies
         run: |
           ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} << 'EOF'
-          cd /tmp/flight-tracker-deploy
-          sudo docker build -t flight-tracker:latest .
+          cd /home/diego/flight-tracker
+          npm ci
           EOF
 
       - name: Run flight search
         run: |
           ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} << 'EOF'
-          sudo docker run --rm \
-            -v flight-tracker-results:/data/results \
-            -e FLIGHT_ORIGIN="${{ vars.FLIGHT_ORIGIN }}" \
-            -e FLIGHT_DESTINATION="${{ vars.FLIGHT_DESTINATION }}" \
-            -e FLIGHT_TARGET="${{ vars.FLIGHT_TARGET }}" \
-            -e FLIGHT_MARGIN="${{ vars.FLIGHT_MARGIN }}" \
-            -e FLIGHT_OUTBOUND_START="${{ vars.FLIGHT_OUTBOUND_START }}" \
-            -e FLIGHT_OUTBOUND_END="${{ vars.FLIGHT_OUTBOUND_END }}" \
-            -e FLIGHT_RETURN_START="${{ vars.FLIGHT_RETURN_START }}" \
-            -e FLIGHT_RETURN_END="${{ vars.FLIGHT_RETURN_END }}" \
-            -e FLIGHT_PASSENGERS="${{ vars.FLIGHT_PASSENGERS }}" \
-            -e FLIGHT_VERBOSE="${{ vars.FLIGHT_VERBOSE }}" \
-            -e LOG_LEVEL="${{ vars.LOG_LEVEL }}" \
-            -e EMAIL_ENABLED="${{ vars.EMAIL_ENABLED }}" \
-            -e EMAIL_RECIPIENT="${{ vars.EMAIL_RECIPIENT }}" \
-            -e EMAIL_CC="${{ vars.EMAIL_CC }}" \
-            -e EMAIL_SMTP_HOST="${{ vars.EMAIL_SMTP_HOST }}" \
-            -e EMAIL_SMTP_PORT="${{ vars.EMAIL_SMTP_PORT }}" \
-            -e EMAIL_SMTP_USER="${{ vars.EMAIL_SMTP_USER }}" \
-            -e EMAIL_SMTP_PASSWORD="${{ secrets.EMAIL_SMTP_PASSWORD }}" \
-            flight-tracker:latest
+          cd /home/diego/flight-tracker
+          RESULTS_DIR=./results \
+          FLIGHT_ORIGIN="${{ vars.FLIGHT_ORIGIN }}" \
+          FLIGHT_DESTINATION="${{ vars.FLIGHT_DESTINATION }}" \
+          FLIGHT_TARGET="${{ vars.FLIGHT_TARGET }}" \
+          FLIGHT_MARGIN="${{ vars.FLIGHT_MARGIN }}" \
+          FLIGHT_OUTBOUND_START="${{ vars.FLIGHT_OUTBOUND_START }}" \
+          FLIGHT_OUTBOUND_END="${{ vars.FLIGHT_OUTBOUND_END }}" \
+          FLIGHT_RETURN_START="${{ vars.FLIGHT_RETURN_START }}" \
+          FLIGHT_RETURN_END="${{ vars.FLIGHT_RETURN_END }}" \
+          FLIGHT_PASSENGERS="${{ vars.FLIGHT_PASSENGERS }}" \
+          FLIGHT_VERBOSE="${{ vars.FLIGHT_VERBOSE }}" \
+          LOG_LEVEL="${{ vars.LOG_LEVEL }}" \
+          EMAIL_ENABLED="${{ vars.EMAIL_ENABLED }}" \
+          EMAIL_RECIPIENT="${{ vars.EMAIL_RECIPIENT }}" \
+          EMAIL_CC="${{ vars.EMAIL_CC }}" \
+          EMAIL_SMTP_HOST="${{ vars.EMAIL_SMTP_HOST }}" \
+          EMAIL_SMTP_PORT="${{ vars.EMAIL_SMTP_PORT }}" \
+          EMAIL_SMTP_USER="${{ vars.EMAIL_SMTP_USER }}" \
+          EMAIL_SMTP_PASSWORD="${{ secrets.EMAIL_SMTP_PASSWORD }}" \
+          npm start
           EOF
 
-      - name: Cleanup
-        if: always()
+      - name: AI fallback — auto-fix scraper
+        if: failure()
         run: |
           ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} << 'EOF'
-          rm -rf /tmp/flight-tracker-deploy
-          sudo docker image prune -f > /dev/null 2>&1 || true
+          cd /home/diego/flight-tracker
+          RESULTS_DIR=./results \
+          FLIGHT_ORIGIN="${{ vars.FLIGHT_ORIGIN }}" \
+          FLIGHT_DESTINATION="${{ vars.FLIGHT_DESTINATION }}" \
+          FLIGHT_TARGET="${{ vars.FLIGHT_TARGET }}" \
+          FLIGHT_MARGIN="${{ vars.FLIGHT_MARGIN }}" \
+          FLIGHT_OUTBOUND_START="${{ vars.FLIGHT_OUTBOUND_START }}" \
+          FLIGHT_OUTBOUND_END="${{ vars.FLIGHT_OUTBOUND_END }}" \
+          FLIGHT_RETURN_START="${{ vars.FLIGHT_RETURN_START }}" \
+          FLIGHT_RETURN_END="${{ vars.FLIGHT_RETURN_END }}" \
+          FLIGHT_PASSENGERS="${{ vars.FLIGHT_PASSENGERS }}" \
+          FLIGHT_VERBOSE="${{ vars.FLIGHT_VERBOSE }}" \
+          LOG_LEVEL="${{ vars.LOG_LEVEL }}" \
+          EMAIL_ENABLED="${{ vars.EMAIL_ENABLED }}" \
+          EMAIL_RECIPIENT="${{ vars.EMAIL_RECIPIENT }}" \
+          EMAIL_CC="${{ vars.EMAIL_CC }}" \
+          EMAIL_SMTP_HOST="${{ vars.EMAIL_SMTP_HOST }}" \
+          EMAIL_SMTP_PORT="${{ vars.EMAIL_SMTP_PORT }}" \
+          EMAIL_SMTP_USER="${{ vars.EMAIL_SMTP_USER }}" \
+          EMAIL_SMTP_PASSWORD="${{ secrets.EMAIL_SMTP_PASSWORD }}" \
+          ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+          npm run ai-fix
           EOF

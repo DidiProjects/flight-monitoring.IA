@@ -9,9 +9,11 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx --watch src/index.ts",
+    "ai-fix": "tsx src/agent.ts",
     "postinstall": "npx camoufox-js fetch"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "camoufox-js": "^0.10.2",
     "chalk": "^5.4.1",
     "cli-table3": "^0.6.5",
