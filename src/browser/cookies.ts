@@ -1,4 +1,4 @@
-import type { Page } from 'rebrowser-playwright';
+import type { Page } from 'playwright';
 import { logger } from '../utils/logger.ts';
 
 export async function acceptCookies(page: Page): Promise<boolean> {

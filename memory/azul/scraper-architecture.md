@@ -3,60 +3,91 @@ name: Arquitetura e fluxo do scraper Azul
 description: Stack, ordem exata do fluxo de automação, arquitetura de buscas, coleta de dados, estado atual do código
 type: project
 ---
-## Stack
-rebrowser-playwright (anti-bot Chromium, headless:false), TypeScript/tsx, pino logger, dotenv.
+## Stack (atual — 2026-04-21)
+
+camoufox-js + playwright (firefox headless), TypeScript/tsx, pino logger, dotenv.
+- `import { firefox } from 'playwright'` + `import { launchOptions } from 'camoufox-js'`
+- Substituiu rebrowser-playwright (Chromium) após detectar bloqueio Akamai em containers
+- Deploy: direto no servidor via SSH (sem Docker)
 
 ## Fluxo de automação (ordem exata)
 
 1. Navegar para `https://www.voeazul.com.br/br/pt/home`
-2. Aceitar cookies (`#onetrust-accept-btn-handler`) + force-hide overlay OneTrust
-3. Clicar em `input[aria-label="Origem"]` → digitar código do aeroporto → clicar option `button[role="option"]` que contém o código em `<b>`
-4. Clicar em `input[aria-label="Destino"]` → digitar código → clicar option
-5. Clicar em `input[aria-label="Datas (Ida e volta)"]` → digitar DDMMYYYY (data início do período de ida)
-6. Clicar `button:text("Buscar passagens")`
-7. Aguardar `p.results` com "voos encontrados" OU `p.css-1wdbheb` (estado vazio) OU `.booking-calendar__cards`
-8. Se estado vazio → pular data sem erro
-9. Coletar voos em BRL (botão "Reais") e em Pontos (botão "Pontos")
-10. Navegar datas no `.booking-calendar__cards` clicando botões com `aria-label` contendo "DD/MM"
-11. Após coletar todo range de ida → repetir do passo 1 com origem/destino invertidos para o range de volta
+2. `waitForEvalReady()` — retenta evaluate até contexto estabilizar
+3. `checkForBlock()` — verifica se Akamai bloqueou
+4. Aceitar cookies (`#onetrust-accept-btn-handler`) + force-hide overlay OneTrust
+5. `waitForSearchForm()` — aguarda `input[aria-label*="Origem"]`
+6. `fillSearchForm()`:
+   a. Clicar container pai do `input[aria-label*="Origem"]` → digitar código → clicar `button[role="option"]`
+   b. Clicar container pai do `input[aria-label*="Destino"]` → digitar → clicar option
+   c. Clicar container pai do `input[aria-label*="Datas"]` → digitar DDMMYYYY
+   d. Clicar `button:text("Buscar passagens")` via DOM
+7. `waitForResults()` → retorna `boolean` (false = estado vazio)
+8. Para cada data no range:
+   a. Se i > 0: `navigateCalendarToDate()` → click button com `aria-label` contendo "DD/MM"
+   b. `waitForResults()`
+   c. `collectAllFares()` — coleta BRL + pontos + híbrido
+9. Após toda ida → nova page/context para rota de volta
 
-## Arquitetura de buscas
+## collectAllFares — fluxo interno
 
-- **Ida e volta são buscas separadas** — cada uma como one-way
-- **Uma página por rota** — não abrir nova página por data; navegar pelo booking-calendar
-- **Range de datas**: digitar a data INÍCIO do range no datepicker; navegar até a data FIM pelo carrossel
-  - Ex: range 2026-05-25 → 2026-05-27: digitar 25052026, navegar carrossel até "qui 27/05"
+1. `setCurrencyView(page, 'Reais')` — garante view BRL
+2. Extrair `brlCards` de `div.flight-card[id]`:
+   - `h4.departure` → depTime, depIata (via `span.iata-day`)
+   - `h4.arrival` → arrTime, arrIata
+   - `button.duration[aria-label]` → durLabel (parse "X hora Y minuto")
+   - `.flight-leg-info button` → legText (parse conexões + voo)
+   - `h4[data-test-id="fare-price"]` → priceText
+3. `setCurrencyView(page, 'Pontos')` — switch para view pontos
+4. Extrair `ptsCards` de `div.flight-card[id]`:
+   - `h4[data-test-id="fare-price"]` → buscar "pontos" no textContent
+   - `p.condition` → texto híbrido "ou X pontos + R$ Y"
+5. Merge por `card.id` → `FlightOffer[]`
 
-## Coleta de dados por passagem
+## setCurrencyView — detalhes importantes
 
-Para cada voo visível coletar:
-- Valor em R$ (view "Reais")
-- Valor em pontos (view "Pontos")
-- Valor híbrido pontos+reais (se disponível)
-- Duração
-- Hora embarque / desembarque
-- Número de escalas
+- Seletor correto: `.currencySelector button[value="${value}"]` (results section)
+- NÃO usar `button[value="score"].first()` — apanha o botão do painel esquerdo (search form), que não controla os cards
+- Após click: `waitForLoadState('networkidle', 8s)` — o site faz chamada API para pontos
+- Wait adicional de 10s verificando `h4[data-test-id="fare-price"]` para "pontos" no textContent
+- Para rotas internacionais (ex: LIS↔CNF): pontos puro pode não estar disponível → h4 fica vazio → correto
 
-Salvar como JSON em `results/RUN_DIR/YYYY-MM-DD/ORIGEM-DESTINO-brl.json` e `-pts.json`
-
-## Estrutura de resultados
+## Output JSON por data
 
 ```
 results/
-  2026-05-10T07-00-00/
-    snapshots/           ← HTML para diagnóstico (home + results por data)
+  2026-04-21T12-00-00/
+    snapshots/           ← HTML para diagnóstico após cada etapa
     errors/              ← debug-*.png + dom-*.html em falhas
-    2026-05-25/
-      VCP-CGH-brl.json
-      VCP-CGH-pts.json
+    2026-05-29/
+      LIS-CNF.json       ← array de FlightOffer (BRL + pontos + híbrido unificados)
 ```
 
-## Estado atual do código (azul.ts) — 2026-04-20
+## Tipos principais (src/types/index.ts)
 
-Implementação correta com:
-- `searchRoute` (uma página por rota, navega calendario)
-- `fillSearchForm` com seletores corretos
-- `waitForResults` retorna `boolean` (false = estado vazio `p.css-1wdbheb`)
-- `collectFlights` usa abordagem iterativa (sem `function` nomeada dentro do evaluate)
-- `waitForEvalReady()` — retenta evaluate até rebrowser context estabilizar
-- Snapshots em `snapshots/` a cada passo
+```typescript
+interface FlightOffer {
+  date: string;               // "YYYY-MM-DD"
+  flightNumber: string;       // "AD8901"
+  origin: { iata: string; timestamp: string };     // ISO 8601 com TZ offset
+  destination: { iata: string; timestamp: string };
+  durationMin: number;
+  stops: number;
+  fares: {
+    brl?: { amount: number; currency: 'BRL' };
+    points?: { amount: number; currency: 'PTS' };  // pontos puro (raro em internacionais)
+    hybrid?: { points: number; cash: number; currency: 'BRL' };
+  };
+  isReturn: boolean;
+  withinTarget: boolean;
+}
+```
+
+## AI Fallback (src/agent.ts)
+
+Quando `npm start` falha:
+- GHA executa `npm run ai-fix` → `src/agent.ts`
+- Agente Claude API (claude-sonnet-4-6) diagnostica e corrige `azul.ts`
+- Tools: bash, read_file, write_file, list_dir
+- Budget: 180k tokens, stop em 25k restantes, max 10 iterações
+- Em sucesso: `git add -A && git commit && git push`

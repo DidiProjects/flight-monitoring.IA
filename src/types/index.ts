@@ -9,30 +9,39 @@ export interface SearchParams {
   returnEnd?: string;
   passengers: number;
   verbose: boolean;
-  runDir?: string;   // set by run manager; scrapers write debug files here
+  runDir?: string;
+}
+
+export interface Fare {
+  amount: number;
+  currency: string; // "BRL" | "PTS"
+}
+
+export interface HybridFare {
+  points: number;
+  cash: number;
+  currency: string; // "BRL"
+}
+
+export interface FlightFares {
+  brl?: Fare;
+  points?: Fare;
+  hybrid?: HybridFare;
+}
+
+export interface AirportRef {
+  iata: string;
+  timestamp: string; // ISO 8601 with UTC offset: "2026-05-20T09:35:00+01:00"
 }
 
 export interface FlightOffer {
-  date: string;
-  origin: string;
-  destination: string;
+  date: string;            // YYYY-MM-DD
   flightNumber: string;
-  departure: string;   // "HH:MM"
-  arrival: string;     // "HH:MM"
+  origin: AirportRef;
+  destination: AirportRef;
   durationMin: number;
   stops: number;
-  price: number;
-  currency: string;
+  fares: FlightFares;
   isReturn: boolean;
   withinTarget: boolean;
-}
-
-export interface RawFlight {
-  flightNumber?: string;
-  departure?: string;
-  arrival?: string;
-  durationMin?: number;
-  stops?: number;
-  price?: number;
-  currency?: string;
 }

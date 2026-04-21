@@ -83,6 +83,8 @@ try {
   spinner.stop();
 
   run.log(`Search complete — ${results.length} offer(s) found`);
+  const threshold = opts.target! * (1 + opts.margin);
+  results.forEach(o => { o.withinTarget = (o.fares.brl?.amount ?? Infinity) <= threshold; });
   await saveResults(run, params, results);
 
   if (results.length === 0) {

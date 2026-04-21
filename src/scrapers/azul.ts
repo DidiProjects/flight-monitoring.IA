@@ -11,7 +11,38 @@ import { dateRange } from '../utils/dates.ts';
 import { logger } from '../utils/logger.ts';
 import { acceptCookies } from '../browser/cookies.ts';
 import { humanDelay } from '../browser/human.ts';
-import type { FlightOffer, SearchParams } from '../types/index.ts';
+import type { FlightOffer, FlightFares, SearchParams } from '../types/index.ts';
+
+// ── Airport timezone offsets ──────────────────────────────────────────────────
+// Static offsets (summer/DST not auto-adjusted — accurate enough for itinerary display)
+const AIRPORT_TZ: Record<string, string> = {
+  // Brazil BRT -03:00
+  GRU: '-03:00', CGH: '-03:00', VCP: '-03:00', GIG: '-03:00',
+  SDU: '-03:00', BSB: '-03:00', CNF: '-03:00', PLU: '-03:00',
+  SSA: '-03:00', FOR: '-03:00', REC: '-03:00', NAT: '-03:00',
+  MCZ: '-03:00', POA: '-03:00', FLN: '-03:00', CWB: '-03:00',
+  VIX: '-03:00', BEL: '-03:00', SLZ: '-03:00', JPA: '-03:00',
+  AJU: '-03:00', THE: '-03:00', PMW: '-03:00', CXJ: '-03:00',
+  // Brazil AMT -04:00
+  CGB: '-04:00', MAO: '-04:00',
+  // Portugal WEST +01:00 (summer)
+  LIS: '+01:00', OPO: '+01:00', FAO: '+01:00',
+  // Europe CEST +02:00 (summer)
+  MAD: '+02:00', BCN: '+02:00', CDG: '+02:00', AMS: '+02:00',
+  FCO: '+02:00', MXP: '+02:00', FRA: '+02:00', ZRH: '+02:00',
+  // UK BST +01:00 (summer)
+  LHR: '+01:00', LGW: '+01:00', MAN: '+01:00',
+  // USA EDT -04:00
+  MIA: '-04:00', JFK: '-04:00', MCO: '-04:00', FLL: '-04:00',
+  EWR: '-04:00', BOS: '-04:00', ATL: '-04:00',
+  // USA PDT -07:00
+  LAX: '-07:00', SFO: '-07:00',
+};
+
+function toTimestamp(date: string, time: string, iata: string): string {
+  const tz = AIRPORT_TZ[iata] ?? '+00:00';
+  return `${date}T${time}:00${tz}`;
+}
 
 const AZUL_HOME = 'https://www.voeazul.com.br/br/pt/home';
 
@@ -48,7 +79,7 @@ export async function searchFlights(params: SearchParams): Promise<FlightOffer[]
   }
 
   const threshold = params.target * (1 + params.margin);
-  results.forEach(o => { o.withinTarget = o.price <= threshold; });
+  results.forEach(o => { o.withinTarget = (o.fares.brl?.amount ?? Infinity) <= threshold; });
   return results;
 }
 
@@ -125,33 +156,22 @@ async function searchRoute(
         }
       }
 
-      // Collect BRL
-      await setCurrencyView(page, 'Reais');
-      await humanDelay(600, 1_000);
-      const brlFlights = await collectFlights(page, origin, destination, date);
+      // Collect all fares (BRL + points + hybrid) in a single pass
+      const flights = await collectAllFares(page, origin, destination, date, params.runDir);
+      flights.forEach(o => { o.isReturn = isReturn; });
 
-      // Collect Points
-      await setCurrencyView(page, 'Pontos');
-      await humanDelay(600, 1_000);
-      const ptsFlights = await collectFlights(page, origin, destination, date);
-
-      logger.info({ date, origin, destination, brl: brlFlights.length, pts: ptsFlights.length }, 'Date collected');
+      logger.info({ date, origin, destination, count: flights.length }, 'Date collected');
 
       if (params.runDir) {
         const dateDir = path.join(params.runDir, date);
         await fs.mkdir(dateDir, { recursive: true });
         await fs.writeFile(
-          path.join(dateDir, `${origin}-${destination}-brl.json`),
-          JSON.stringify(brlFlights, null, 2),
-        );
-        await fs.writeFile(
-          path.join(dateDir, `${origin}-${destination}-pts.json`),
-          JSON.stringify(ptsFlights, null, 2),
+          path.join(dateDir, `${origin}-${destination}.json`),
+          JSON.stringify(flights, null, 2),
         );
       }
 
-      brlFlights.forEach(o => { o.isReturn = isReturn; });
-      allOffers.push(...brlFlights);
+      allOffers.push(...flights);
     }
 
   } catch (err) {
@@ -414,139 +434,222 @@ async function navigateCalendarToDate(page: Page, date: string): Promise<boolean
 // ── Currency toggle ───────────────────────────────────────────────────────────
 
 async function setCurrencyView(page: Page, view: 'Reais' | 'Pontos'): Promise<void> {
-  await page.evaluate((v) => {
-    const btns = Array.from(document.querySelectorAll<HTMLElement>('button'));
-    const btn = btns.find(b =>
-      b.getAttribute('aria-label') === v || b.textContent?.trim() === v,
-    );
-    if (btn) btn.click();
-  }, view);
-  await humanDelay(400, 700);
+  const isPoints = view === 'Pontos';
+  const value    = isPoints ? 'score' : 'currency';
+
+  // Target the results-section toggle specifically (inside .currencySelector, right above card-list)
+  // Falls back to first match if currencySelector is not found
+  const btn = page.locator(`.currencySelector button[value="${value}"]`).first();
+  const btnFallback = page.locator(`button[value="${value}"]`).first();
+  const target = (await btn.count().catch(() => 0)) > 0 ? btn : btnFallback;
+  const exists = (await target.count().catch(() => 0)) > 0;
+
+  if (exists) {
+    try {
+      await target.scrollIntoViewIfNeeded({ timeout: 3_000 });
+      await target.click({ timeout: 5_000 });
+    } catch {
+      // Fallback: PointerEvent sequence bubbles through React's root listener
+      await page.evaluate((val) => {
+        const container = document.querySelector('.currencySelector') ?? document;
+        const b = container.querySelector<HTMLElement>(`button[value="${val}"]`);
+        if (b) {
+          b.scrollIntoView({ behavior: 'instant', block: 'center' });
+          ['pointerdown', 'pointerup'].forEach(t =>
+            b.dispatchEvent(new PointerEvent(t, { bubbles: true, cancelable: true })),
+          );
+          b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        }
+      }, value);
+    }
+  }
+
+  // Wait for any network requests triggered by the currency toggle to settle
+  await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
+
+  // Dismiss error modal if the currency switch triggered an API error
+  const errorBtn = page.locator('button:text("Ok, entendi")').first();
+  if ((await errorBtn.count().catch(() => 0)) > 0) {
+    await errorBtn.click({ timeout: 3_000 }).catch(() => {});
+    logger.warn({ view }, 'Dismissed error modal after currency switch');
+  }
+
+  // Wait for at least one fare price element to reflect the new view
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const switched = await page.evaluate((pts) => {
+      const el = document.querySelector<HTMLElement>('h4[data-test-id="fare-price"]');
+      if (!el) return false;
+      const text = el.textContent ?? '';
+      return pts ? /pontos/i.test(text) : /R\$/.test(text);
+    }, isPoints).catch(() => false);
+    if (switched) break;
+    await page.waitForTimeout(300);
+  }
+
+  await humanDelay(200, 400);
 }
 
 // ── Flight data collection ────────────────────────────────────────────────────
 
-async function collectFlights(
+// Collects base info + BRL fares (in Reais view) + points/hybrid fares (in Pontos view)
+// in a single function, returning a unified FlightOffer per card.
+async function collectAllFares(
   page: Page,
   origin: string,
   destination: string,
   date: string,
+  runDir?: string,
 ): Promise<FlightOffer[]> {
-  // Walk the DOM looking for elements that contain both time patterns and price/points content
-  // Uses iterative stack to avoid named functions inside evaluate (tsx __name issue)
-  const rawCards = await page.evaluate(() => {
-    const results: Array<{ html: string; text: string }> = [];
-    const seen = new Set<string>();
-    const root = document.querySelector('main') ?? document.body;
-    const stack: Array<[Element, number]> = [[root, 0]];
+  // ── Step 1: BRL view ──────────────────────────────────────────────────────
+  await setCurrencyView(page, 'Reais');
+  await humanDelay(600, 1_000);
 
-    while (stack.length > 0) {
-      const item = stack.pop()!;
-      const el = item[0];
-      const depth = item[1];
-      if (depth > 12) continue;
-      const childCount = el.children.length;
-      const text = (el as HTMLElement).innerText ?? el.textContent ?? '';
-      const hasTime = /\b\d{2}:\d{2}\b/.test(text);
-      const hasPrice = /R\$|pontos|\d{3,}/i.test(text);
-      if (hasTime && hasPrice && childCount >= 2 && childCount <= 40) {
-        const html = (el as HTMLElement).outerHTML;
-        if (html.length > 80 && html.length < 12_000) {
-          const key = text.slice(0, 120).replace(/\s+/g, ' ');
-          if (!seen.has(key)) {
-            seen.add(key);
-            results.push({ html, text: text.replace(/\s+/g, ' ').trim() });
-            continue; // Don't recurse into a matched card
-          }
-        }
-      }
-      for (let i = el.children.length - 1; i >= 0; i--) {
-        stack.push([el.children[i]!, depth + 1]);
-      }
-    }
+  type BrlCard = {
+    cardId: string;
+    depTime: string; depIata: string;
+    arrTime: string; arrIata: string;
+    durLabel: string; legText: string;
+    priceText: string;
+  };
 
-    return results.slice(0, 40);
+  const brlCards: BrlCard[] = await page.evaluate(() => {
+    const cards = Array.from(document.querySelectorAll<HTMLElement>('div.flight-card[id]'));
+    return cards.map(card => {
+      const cardId = card.id;
+
+      const depEl = card.querySelector('h4.departure');
+      const depTime = (depEl?.firstChild as Text | null)?.data?.trim() ?? '';
+      const depIata = depEl?.querySelector('span.iata-day')?.textContent?.trim() ?? '';
+
+      const arrEl = card.querySelector('h4.arrival');
+      const arrTime = (arrEl?.firstChild as Text | null)?.data?.trim() ?? '';
+      const arrIata = arrEl?.querySelector('.iata-day.arrival, span.iata-day')?.textContent?.trim() ?? '';
+
+      const durBtn = card.querySelector<HTMLElement>('button.duration');
+      const durLabel = durBtn?.getAttribute('aria-label') ?? '';
+
+      const legBtn = card.querySelector('.flight-leg-info button');
+      const legText = legBtn?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+
+      const priceEl = card.querySelector<HTMLElement>('h4[data-test-id="fare-price"]');
+      const priceText = (priceEl?.innerText ?? priceEl?.textContent ?? '').replace(/\s+/g, '');
+
+      return { cardId, depTime, depIata, arrTime, arrIata, durLabel, legText, priceText } as {
+        cardId: string; depTime: string; depIata: string;
+        arrTime: string; arrIata: string;
+        durLabel: string; legText: string; priceText: string;
+      };
+    });
   });
 
-  logger.debug({ count: rawCards.length, date, origin, destination }, 'Flight card candidates found');
+  // ── Step 2: Points view ───────────────────────────────────────────────────
+  await setCurrencyView(page, 'Pontos');
+
+  // setCurrencyView already waited for "pontos" to appear in the fare price text
+  await humanDelay(400, 700);
+
+  type PtsCard = { cardId: string; ptsText: string; condText: string; debug: string };
+
+  const ptsCards: PtsCard[] = await page.evaluate(() => {
+    const cards = Array.from(document.querySelectorAll<HTMLElement>('div.flight-card[id]'));
+    return cards.map(card => {
+      // In Points view the same h4[data-test-id="fare-price"] is reused — only content changes
+      const fareEl = card.querySelector<HTMLElement>('h4[data-test-id="fare-price"]');
+      const fareText = (fareEl?.textContent ?? '').replace(/\s+/g, ' ').trim();
+
+      // Points amount: "230.000 pontos" → "230.000"
+      const ptsMatch = fareText.match(/([\d.]+)\s*pontos/i);
+      const ptsText = ptsMatch ? ptsMatch[1]! : '';
+
+      // Hybrid: p.condition → "ou 16.100 pontos + R$ 2.409,96"
+      const condEl = card.querySelector<HTMLElement>('p.condition');
+      const condText = condEl?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+
+      return { cardId: card.id, ptsText, condText, debug: fareText.slice(0, 40) } as PtsCard;
+    });
+  });
+
+  if (runDir) {
+    const snapDir = path.join(runDir, 'snapshots');
+    await fs.mkdir(snapDir, { recursive: true }).catch(() => {});
+    await page.screenshot({ path: path.join(snapDir, `${origin}-${destination}-${date}-pts-view.png`), fullPage: false }).catch(() => {});
+  }
+  await saveSnapshot(page, runDir, `${origin}-${destination}-${date}-pts-view`);
+
+  const ptsMap = new Map(ptsCards.map(c => [c.cardId, c]));
+
+  // ── Step 3: Merge ─────────────────────────────────────────────────────────
+  logger.debug({ count: brlCards.length, date, origin, destination }, 'Flight cards found');
 
   const offers: FlightOffer[] = [];
   const seen = new Set<string>();
 
-  for (const { text, html } of rawCards) {
-    const offer = parseFlightCard(text, html, origin, destination, date);
-    if (!offer) continue;
-    const key = `${offer.departure}-${offer.arrival}-${offer.price}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      offers.push(offer);
+  for (const b of brlCards) {
+    if (!b.depTime || !b.arrTime) continue;
+    if (seen.has(b.cardId)) continue;
+    seen.add(b.cardId);
+
+    // Duration from aria-label: "Tempo de duração: 13 hora 55 minuto. Ver detalhes"
+    const durMatch = b.durLabel.match(/(\d+)\s*hora[s]?[\s,]*(\d+)?\s*minuto/i);
+    const durationMin = durMatch
+      ? parseInt(durMatch[1]!) * 60 + (durMatch[2] ? parseInt(durMatch[2]!) : 0)
+      : 0;
+
+    // Stops + flight number from leg text: "1 conexão    •  Voo 8751" or "Direto  •  Voo 1234"
+    let stops = 0;
+    const conexMatch = b.legText.match(/(\d+)\s*conex/i);
+    if (conexMatch) stops = parseInt(conexMatch[1]!);
+    else if (/direto/i.test(b.legText)) stops = 0;
+
+    const vooMatch = b.legText.match(/Voo\s*(\d+)/i);
+    const flightNumber = vooMatch ? `AD${vooMatch[1]}` : 'AD???';
+
+    // BRL fare: "R$2.843,50" or "R$2.84350"
+    const fares: FlightFares = {};
+    const brlMatch = b.priceText.match(/R?\$?([\d.]+)[,.](\d{2})$/);
+    if (brlMatch) {
+      const amount = parseFloat(brlMatch[1]!.replace(/\./g, '') + '.' + brlMatch[2]!);
+      if (amount > 0) fares.brl = { amount, currency: 'BRL' };
+    } else {
+      const brlSimple = b.priceText.match(/[\d.,]+/);
+      if (brlSimple) {
+        const amount = parseFloat(brlSimple[0]!.replace(/\./g, '').replace(',', '.'));
+        if (amount > 0) fares.brl = { amount, currency: 'BRL' };
+      }
     }
+
+    // Points fare
+    const pts = ptsMap.get(b.cardId);
+    if (pts) {
+      const ptsAmount = parseInt(pts.ptsText.replace(/\./g, '').replace(/\D/g, ''));
+      if (ptsAmount > 0) fares.points = { amount: ptsAmount, currency: 'PTS' };
+
+      // Hybrid: "ou 16.100 pontos + R$ 2.409,96"
+      const hybMatch = pts.condText.match(/([\d.]+)\s*pontos?\s*\+\s*R\$\s*([\d.,]+)/i);
+      if (hybMatch) {
+        const hybPoints = parseInt(hybMatch[1]!.replace(/\./g, ''));
+        const hybCash   = parseFloat(hybMatch[2]!.replace(/\./g, '').replace(',', '.'));
+        if (hybPoints > 0 && hybCash > 0) {
+          fares.hybrid = { points: hybPoints, cash: hybCash, currency: 'BRL' };
+        }
+      }
+    }
+
+    offers.push({
+      date,
+      flightNumber,
+      origin:      { iata: b.depIata || origin,      timestamp: toTimestamp(date, b.depTime, b.depIata || origin) },
+      destination: { iata: b.arrIata || destination, timestamp: toTimestamp(date, b.arrTime, b.arrIata || destination) },
+      durationMin,
+      stops,
+      fares,
+      isReturn:     false,
+      withinTarget: false,
+    });
   }
 
   return offers;
-}
-
-function parseFlightCard(
-  text: string,
-  html: string,
-  origin: string,
-  destination: string,
-  date: string,
-): FlightOffer | null {
-  // Need at least two time tokens for departure + arrival
-  const times = [...text.matchAll(/\b(\d{2}:\d{2})\b/g)].map(m => m[1]!);
-  if (times.length < 2) return null;
-
-  const departure = times[0]!;
-  const arrival = times[1]!;
-
-  // Price
-  let price = 0;
-  let currency = 'BRL';
-
-  const brlMatch = text.match(/R\$\s*([\d.,]+)/);
-  const ptsMatch = text.match(/([\d.,]+)\s*pontos?/i) ?? text.match(/(\d{3,})\s*pts\b/i);
-
-  if (brlMatch) {
-    price = parseFloat(brlMatch[1]!.replace(/\./g, '').replace(',', '.'));
-    currency = 'BRL';
-  } else if (ptsMatch) {
-    price = parseFloat(ptsMatch[1]!.replace(/\./g, '').replace(',', '.'));
-    currency = 'PTS';
-  }
-
-  if (price <= 0 || isNaN(price)) return null;
-
-  // Flight number
-  const fnMatch = (html + text).match(/AD[\s-]?(\d{3,4})/i);
-  const flightNumber = fnMatch ? `AD${fnMatch[1]}` : 'AD???';
-
-  // Stops
-  let stops = 0;
-  if (/\b2\s*esc/i.test(text)) stops = 2;
-  else if (/\b1\s*esc|1\s*parada/i.test(text)) stops = 1;
-  else if (/direto|nonstop|non.?stop/i.test(text)) stops = 0;
-
-  // Duration
-  const durMatch = text.match(/(\d+)h\s*(\d+)?m?/i);
-  const durationMin = durMatch
-    ? parseInt(durMatch[1]!) * 60 + (durMatch[2] ? parseInt(durMatch[2]) : 0)
-    : 0;
-
-  return {
-    date,
-    origin,
-    destination,
-    flightNumber,
-    departure,
-    arrival,
-    durationMin,
-    stops,
-    price,
-    currency,
-    isReturn: false,
-    withinTarget: false,
-  };
 }
 
 // ── Snapshots ─────────────────────────────────────────────────────────────────
