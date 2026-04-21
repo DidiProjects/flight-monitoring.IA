@@ -82,7 +82,7 @@ try {
   const results = await searchFlights(searchParams);
   spinner.stop();
 
-  run.log(`Search complete — ${results.length} offer(s) found`);
+  run.log(`Search complete, ${results.length} offer(s) found`);
   const threshold = opts.target! * (1 + opts.margin);
   results.forEach(o => { o.withinTarget = (o.fares.brl?.amount ?? Infinity) <= threshold; });
   await saveResults(run, params, results);

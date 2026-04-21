@@ -1,5 +1,5 @@
 ---
-name: Estrutura DOM real do site da Azul — seletores confirmados
+name: Estrutura DOM real do site da Azul, seletores confirmados
 description: HTML exato dos elementos interativos descobertos via DevTools/snapshots
 type: project
 ---
@@ -27,7 +27,7 @@ Todos os seletores abaixo foram confirmados via HTML real do site.
 ```
 - Clicar nele → digitar data como DDMMYYYY (apenas números, sem separadores)
 - Ex: 10/05/2026 → digitar "10052026"
-- NÃO abre modal separado — digita diretamente no input
+- NÃO abre modal separado, digita diretamente no input
 - Após digitar → clicar "Buscar passagens" diretamente
 
 **Botão buscar:**
@@ -48,7 +48,7 @@ Todos os seletores abaixo foram confirmados via HTML real do site.
 <p class="css-1wdbheb">Parece que não temos voos disponíveis para a data selecionada </p>
 ```
 - Detectar com `p.css-1wdbheb`
-- Tratar como resultado vazio — NÃO lançar erro, apenas logar e pular a data
+- Tratar como resultado vazio, NÃO lançar erro, apenas logar e pular a data
 
 **Carrossel de datas (booking-calendar):**
 ```html
@@ -57,9 +57,9 @@ Todos os seletores abaixo foram confirmados via HTML real do site.
 ```
 - Navegar por data clicando no button cujo `aria-label` contém "DD/MM"
 
-**Toggle de moeda — DOIS conjuntos na página:**
+**Toggle de moeda, DOIS conjuntos na página:**
 ```html
-<!-- 1. No painel da esquerda (formulário de busca) — NÃO usar para alterar view de resultados -->
+<!-- 1. No painel da esquerda (formulário de busca), NÃO usar para alterar view de resultados -->
 <div class="radioViewer_search_box">
   <div class="radio_viewer_currency_score_container">
     <button type="button" aria-label="Reais" value="currency">Reais</button>
@@ -67,7 +67,7 @@ Todos os seletores abaixo foram confirmados via HTML real do site.
   </div>
 </div>
 
-<!-- 2. Na seção de resultados — ESTE controla os cards de voo -->
+<!-- 2. Na seção de resultados, ESTE controla os cards de voo -->
 <div class="currencySelector">
   <div class="radio_viewer_currency_score_container">
     <button type="button" aria-label="Reais" value="currency">Reais</button>
@@ -76,13 +76,13 @@ Todos os seletores abaixo foram confirmados via HTML real do site.
 </div>
 ```
 - **Selector correto:** `.currencySelector button[value="score"]` (resultados) ou `.currencySelector button[value="currency"]`
-- `button[value="score"].first()` clica no painel esquerdo (errado) — não altera os cards
+- `button[value="score"].first()` clica no painel esquerdo (errado), não altera os cards
 - Após clicar, aguardar `networkidle` pois o site faz chamada API para buscar preços em pontos
 
-**Classe CSS dos botões de toggle (CSS-in-JS — podem mudar):**
+**Classe CSS dos botões de toggle (CSS-in-JS, podem mudar):**
 - Botão ativo: `css-6fpksg`
 - Botão inativo: `css-i3qimh`
-- NÃO depender dessas classes — usar `value` attribute
+- NÃO depender dessas classes, usar `value` attribute
 
 ## Cards de voo (`div.flight-card[id]`)
 
@@ -125,10 +125,10 @@ Todos os seletores abaixo foram confirmados via HTML real do site.
 
 ## Inputs com opacity:0 (styled-components)
 
-Origem, Destino e Datas são inputs com CSS `opacity:0` — não são "visíveis" pelo Playwright.
+Origem, Destino e Datas são inputs com CSS `opacity:0`, não são "visíveis" pelo Playwright.
 Solução: usar `page.mouse.click(x, y)` com coords reais via `getBoundingClientRect()` do container.
 
-## tsx/esbuild + page.evaluate — ATENÇÃO
+## tsx/esbuild + page.evaluate, ATENÇÃO
 
 tsx 4.x compila com `keepNames: true` → adiciona `__name(fn, "nome")` em funções nomeadas.
 Quando `page.evaluate(() => { function walk() {} })` é serializado, o browser não encontra `__name` → erro.
@@ -140,4 +140,4 @@ Usar abordagem iterativa com stack/array ou lambdas anônimas sem nome.
 
 Stack atual: camoufox-js com `firefox` do playwright (substituiu rebrowser-playwright).
 Import: `import { firefox } from 'playwright'` + `import { launchOptions } from 'camoufox-js'`.
-Tipos: `import type { Browser, Page } from 'playwright'` (NÃO rebrowser-playwright — evita conflito de tipos).
+Tipos: `import type { Browser, Page } from 'playwright'` (NÃO rebrowser-playwright, evita conflito de tipos).

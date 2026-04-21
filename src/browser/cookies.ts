@@ -14,7 +14,7 @@ export async function acceptCookies(page: Page): Promise<boolean> {
     logger.debug('Cookie banner dismissed via OneTrust accept button');
     return true;
   } catch {
-    // OneTrust not found — try text-based fallbacks
+    // OneTrust not found, try text-based fallbacks
   }
 
   // ── Step 2: Text-based fallback strategies ────────────────────────────────

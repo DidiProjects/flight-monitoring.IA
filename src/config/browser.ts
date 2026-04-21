@@ -9,7 +9,7 @@ export const contextOptions: BrowserContextOptions = {
   },
 };
 
-/** Resource types to abort — speeds up the scraper significantly */
+/** Resource types to abort, speeds up the scraper significantly */
 export const BLOCKED_RESOURCES = new Set([
   'image',
   'media',

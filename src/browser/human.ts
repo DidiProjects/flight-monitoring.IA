@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
 
-/** Delay aleatório entre min e max ms — simula comportamento humano */
+/** Delay aleatório entre min e max ms, simula comportamento humano */
 export const humanDelay = (min = 300, max = 900): Promise<void> =>
   new Promise(r => setTimeout(r, min + Math.random() * (max - min)));
 

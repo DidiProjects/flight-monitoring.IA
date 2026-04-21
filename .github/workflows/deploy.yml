@@ -66,12 +66,12 @@ jobs:
           EMAIL_CC="${{ vars.EMAIL_CC }}" \
           EMAIL_SMTP_HOST="${{ vars.EMAIL_SMTP_HOST }}" \
           EMAIL_SMTP_PORT="${{ vars.EMAIL_SMTP_PORT }}" \
-          EMAIL_SMTP_USER="${{ vars.EMAIL_SMTP_USER }}" \
+          EMAIL_SMTP_USER="${{ secrets.EMAIL_SMTP_USER }}" \
           EMAIL_SMTP_PASSWORD="${{ secrets.EMAIL_SMTP_PASSWORD }}" \
           npm start
           EOF
 
-      - name: AI fallback — auto-fix scraper
+      - name: AI fallback, auto-fix scraper
         if: failure()
         run: |
           ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} << 'EOF'
