@@ -244,8 +244,8 @@ async function tryDirectNavigation(
     logger.debug({ attempt, origin, destination, date }, 'Trying direct URL navigation');
     try {
       await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
-      await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
-      await humanDelay(1_000, 2_000);
+      await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+      await humanDelay(500, 1_000);
       await waitForEvalReady(page);
       await checkForBlock(page);
       await acceptCookies(page);
@@ -453,7 +453,7 @@ async function setPassengers(page: Page, count: number): Promise<void> {
 // Returns true if results loaded, false if empty-state (no flights available).
 // Uses locator polling, avoids page.waitForFunction serialization issues with tsx.
 async function waitForResults(page: Page): Promise<boolean> {
-  const deadline = Date.now() + 35_000;
+  const deadline = Date.now() + 25_000;
 
   while (Date.now() < deadline) {
     if ((await page.locator('p.results').count().catch(() => 0)) > 0) {
@@ -536,7 +536,7 @@ async function setCurrencyView(page: Page, view: 'Reais' | 'Pontos'): Promise<vo
   }
 
   // Wait for any network requests triggered by the currency toggle to settle
-  await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
+  await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
 
   // Dismiss error modal if the currency switch triggered an API error
   const errorBtn = page.locator('button:text("Ok, entendi")').first();
@@ -546,10 +546,11 @@ async function setCurrencyView(page: Page, view: 'Reais' | 'Pontos'): Promise<vo
   }
 
   // Wait for at least one fare price element to reflect the new view
+  // Use [data-test-id~="fare-price"] (word match) to catch both "fare-price" and "fare-price fare-price-with-points"
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     const switched = await page.evaluate((pts) => {
-      const el = document.querySelector<HTMLElement>('h4[data-test-id="fare-price"]');
+      const el = document.querySelector<HTMLElement>('[data-test-id~="fare-price"]');
       if (!el) return false;
       const text = el.textContent ?? '';
       return pts ? /pontos/i.test(text) : /R\$/.test(text);
@@ -625,11 +626,15 @@ async function collectAllFares(
   const ptsCards: PtsCard[] = await page.evaluate(() => {
     const cards = Array.from(document.querySelectorAll<HTMLElement>('div.flight-card[id]'));
     return cards.map(card => {
-      // In Points view the same h4[data-test-id="fare-price"] is reused, only content changes
-      const fareEl = card.querySelector<HTMLElement>('h4[data-test-id="fare-price"]');
-      const fareText = (fareEl?.textContent ?? '').replace(/\s+/g, ' ').trim();
+      // Points-only price: dedicated element with data-test-id containing "fare-price-with-points"
+      // HTML example: <h4 data-test-id="fare-price fare-price-with-points">399.960<span class="points">pontos</span></h4>
+      const ptsOnlyEl =
+        card.querySelector<HTMLElement>('.fare-container [data-test-id~="fare-price-with-points"]') ??
+        card.querySelector<HTMLElement>('[data-test-id~="fare-price-with-points"]') ??
+        card.querySelector<HTMLElement>('[data-test-id~="fare-price"]');
+      const fareText = (ptsOnlyEl?.textContent ?? '').replace(/\s+/g, ' ').trim();
 
-      // Points amount: "230.000 pontos" → "230.000"
+      // Points amount: "399.960 pontos" or "230.000 pontos"
       const ptsMatch = fareText.match(/([\d.]+)\s*pontos/i);
       const ptsText = ptsMatch ? ptsMatch[1]! : '';
 
