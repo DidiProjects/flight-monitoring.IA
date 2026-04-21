@@ -132,15 +132,23 @@ try {
 
       if (withinTarget.length > 0) {
         // Determine which target type matched (priority: BRL → PTS → HYB)
-        const firstMatch = withinTarget[0]!;
         const m = 1 + params.margin;
-        const matchedType =
-          targets.brl != null && firstMatch.fares.brl && firstMatch.fares.brl.amount <= targets.brl * m ? 'brl' :
-          targets.pts != null && firstMatch.fares.points && firstMatch.fares.points.amount <= targets.pts * m ? 'pts' :
+        const matchedType: 'brl' | 'pts' | 'hyb' =
+          withinTarget.some(o => targets.brl != null && o.fares.brl && o.fares.brl.amount <= targets.brl * m) ? 'brl' :
+          withinTarget.some(o => targets.pts != null && o.fares.points && o.fares.points.amount <= targets.pts * m) ? 'pts' :
           'hyb';
 
+        // Pick the single best offer for the matched target type
+        const bestOffer = withinTarget.reduce((best, o) => {
+          const val = (x: typeof o) =>
+            matchedType === 'brl' ? (x.fares.brl?.amount ?? Infinity) :
+            matchedType === 'pts' ? (x.fares.points?.amount ?? Infinity) :
+            (x.fares.hybrid?.points ?? Infinity);
+          return val(o) < val(best) ? o : best;
+        });
+
         const { subject, html } = buildAlertEmail(
-          withinTarget,
+          bestOffer,
           params.origin,
           params.destination,
           matchedType,
@@ -148,7 +156,7 @@ try {
         );
         await sendEmail(subject, html);
         markEmailSent(state, today);
-        run.log(`Alert email sent (${withinTarget.length} offer(s) within target)`);
+        run.log(`Alert email sent — best offer: ${matchedType.toUpperCase()} ${bestOffer.date} ${bestOffer.flightNumber}`);
 
       } else if (runCount >= 20) {
         const best = pickBestOffer(state, today);

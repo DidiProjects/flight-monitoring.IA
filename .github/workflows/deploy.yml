@@ -52,7 +52,10 @@ jobs:
           RESULTS_DIR=./results \
           FLIGHT_ORIGIN="${{ vars.FLIGHT_ORIGIN }}" \
           FLIGHT_DESTINATION="${{ vars.FLIGHT_DESTINATION }}" \
-          FLIGHT_TARGET="${{ vars.FLIGHT_TARGET }}" \
+          FLIGHT_TARGET_BRL="${{ vars.FLIGHT_TARGET_BRL }}" \
+          FLIGHT_TARGET_PTS="${{ vars.FLIGHT_TARGET_PTS }}" \
+          FLIGHT_TARGET_HYB_PTS="${{ vars.FLIGHT_TARGET_HYB_PTS }}" \
+          FLIGHT_TARGET_HYB_BRL="${{ vars.FLIGHT_TARGET_HYB_BRL }}" \
           FLIGHT_MARGIN="${{ vars.FLIGHT_MARGIN }}" \
           FLIGHT_OUTBOUND_START="${{ vars.FLIGHT_OUTBOUND_START }}" \
           FLIGHT_OUTBOUND_END="${{ vars.FLIGHT_OUTBOUND_END }}" \
@@ -79,7 +82,10 @@ jobs:
           RESULTS_DIR=./results \
           FLIGHT_ORIGIN="${{ vars.FLIGHT_ORIGIN }}" \
           FLIGHT_DESTINATION="${{ vars.FLIGHT_DESTINATION }}" \
-          FLIGHT_TARGET="${{ vars.FLIGHT_TARGET }}" \
+          FLIGHT_TARGET_BRL="${{ vars.FLIGHT_TARGET_BRL }}" \
+          FLIGHT_TARGET_PTS="${{ vars.FLIGHT_TARGET_PTS }}" \
+          FLIGHT_TARGET_HYB_PTS="${{ vars.FLIGHT_TARGET_HYB_PTS }}" \
+          FLIGHT_TARGET_HYB_BRL="${{ vars.FLIGHT_TARGET_HYB_BRL }}" \
           FLIGHT_MARGIN="${{ vars.FLIGHT_MARGIN }}" \
           FLIGHT_OUTBOUND_START="${{ vars.FLIGHT_OUTBOUND_START }}" \
           FLIGHT_OUTBOUND_END="${{ vars.FLIGHT_OUTBOUND_END }}" \

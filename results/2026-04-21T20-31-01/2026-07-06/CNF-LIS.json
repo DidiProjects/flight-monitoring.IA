@@ -1,0 +1,210 @@
+[
+  {
+    "date": "2026-07-06",
+    "flightNumber": "AD4328",
+    "origin": {
+      "iata": "CNF • 06/07",
+      "timestamp": "2026-07-06T09:45:00+00:00"
+    },
+    "destination": {
+      "iata": "LIS • 07/07",
+      "timestamp": "2026-07-06T07:05:00+00:00"
+    },
+    "durationMin": 1040,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 3834.08,
+        "currency": "BRL"
+      },
+      "points": {
+        "amount": 330000,
+        "currency": "PTS"
+      },
+      "hybrid": {
+        "points": 23100,
+        "cash": 3564.98,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-07-06",
+    "flightNumber": "AD4321",
+    "origin": {
+      "iata": "CNF • 06/07",
+      "timestamp": "2026-07-06T13:00:00+00:00"
+    },
+    "destination": {
+      "iata": "LIS • 07/07",
+      "timestamp": "2026-07-06T07:05:00+00:00"
+    },
+    "durationMin": 845,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 3834.08,
+        "currency": "BRL"
+      },
+      "points": {
+        "amount": 330000,
+        "currency": "PTS"
+      },
+      "hybrid": {
+        "points": 23100,
+        "cash": 3564.98,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-07-06",
+    "flightNumber": "AD4321",
+    "origin": {
+      "iata": "CNF • 06/07",
+      "timestamp": "2026-07-06T13:00:00+00:00"
+    },
+    "destination": {
+      "iata": "LIS • 07/07",
+      "timestamp": "2026-07-06T11:00:00+00:00"
+    },
+    "durationMin": 0,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 3834.08,
+        "currency": "BRL"
+      },
+      "points": {
+        "amount": 330000,
+        "currency": "PTS"
+      },
+      "hybrid": {
+        "points": 23100,
+        "cash": 3564.98,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-07-06",
+    "flightNumber": "AD4917",
+    "origin": {
+      "iata": "CNF • 06/07",
+      "timestamp": "2026-07-06T14:05:00+00:00"
+    },
+    "destination": {
+      "iata": "LIS • 07/07",
+      "timestamp": "2026-07-06T07:05:00+00:00"
+    },
+    "durationMin": 0,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 3834.08,
+        "currency": "BRL"
+      },
+      "points": {
+        "amount": 330000,
+        "currency": "PTS"
+      },
+      "hybrid": {
+        "points": 23100,
+        "cash": 3564.98,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-07-06",
+    "flightNumber": "AD4917",
+    "origin": {
+      "iata": "CNF • 06/07",
+      "timestamp": "2026-07-06T14:05:00+00:00"
+    },
+    "destination": {
+      "iata": "LIS • 07/07",
+      "timestamp": "2026-07-06T11:00:00+00:00"
+    },
+    "durationMin": 1015,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 3834.08,
+        "currency": "BRL"
+      },
+      "points": {
+        "amount": 330000,
+        "currency": "PTS"
+      },
+      "hybrid": {
+        "points": 23100,
+        "cash": 3564.98,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-07-06",
+    "flightNumber": "AD4046",
+    "origin": {
+      "iata": "CNF • 06/07",
+      "timestamp": "2026-07-06T16:00:00+00:00"
+    },
+    "destination": {
+      "iata": "LIS • 07/07",
+      "timestamp": "2026-07-06T11:00:00+00:00"
+    },
+    "durationMin": 0,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 3834.08,
+        "currency": "BRL"
+      },
+      "points": {
+        "amount": 330000,
+        "currency": "PTS"
+      },
+      "hybrid": {
+        "points": 23100,
+        "cash": 3564.98,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-07-06",
+    "flightNumber": "AD4046",
+    "origin": {
+      "iata": "CNF • 06/07",
+      "timestamp": "2026-07-06T16:00:00+00:00"
+    },
+    "destination": {
+      "iata": "LIS • 07/07",
+      "timestamp": "2026-07-06T14:00:00+00:00"
+    },
+    "durationMin": 0,
+    "stops": 2,
+    "fares": {
+      "brl": {
+        "amount": 6263.24,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  }
+]

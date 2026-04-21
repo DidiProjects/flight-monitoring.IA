@@ -113,26 +113,20 @@ export interface EmailContent {
 }
 
 export function buildAlertEmail(
-  offers: FlightOffer[],
+  offer: FlightOffer,
   origin: string,
   destination: string,
   targetType: 'brl' | 'pts' | 'hyb',
   passengers: number,
 ): EmailContent {
   const routeLabel = `${origin} → ${destination}`;
-  const outbound = offers.filter(o => !o.isReturn);
-  const returns  = offers.filter(o => o.isReturn);
+  const label = offer.isReturn
+    ? `Volta  ${offer.origin.iata} → ${offer.destination.iata}`
+    : `Ida  ${offer.origin.iata} → ${offer.destination.iata}`;
 
-  let body = '';
-  for (const o of outbound) {
-    body += offerBlock(o, targetType, passengers, `Ida  ${o.origin.iata} → ${o.destination.iata}`);
-  }
-  for (const o of returns) {
-    body += offerBlock(o, targetType, passengers, `Volta  ${o.origin.iata} → ${o.destination.iata}`);
-  }
-
+  const body = offerBlock(offer, targetType, passengers, label);
   const subject = `Azul — Tarifa disponível: ${routeLabel}`;
-  const subtitle = `Encontramos passagens dentro do seu limite para a rota <strong>${routeLabel}</strong>.`;
+  const subtitle = `Encontramos a melhor passagem dentro do seu limite para a rota <strong>${routeLabel}</strong>.`;
 
   return { subject, html: layout(subject, subtitle, body) };
 }
