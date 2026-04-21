@@ -44,7 +44,16 @@ function toTimestamp(date: string, time: string, iata: string): string {
   return `${date}T${time}:00${tz}`;
 }
 
-const AZUL_HOME = 'https://www.voeazul.com.br/br/pt/home';
+const AZUL_HOME    = 'https://www.voeazul.com.br/br/pt/home';
+const AZUL_RESULTS = 'https://www.voeazul.com.br/br/pt/home/selecao-voo';
+
+// Builds the direct deep-link URL for a flight search
+// date: "YYYY-MM-DD", currency: "BRL" | "PTS"
+function buildSearchUrl(origin: string, destination: string, date: string, currency: 'BRL' | 'PTS', passengers: number): string {
+  const [year, month, day] = date.split('-');
+  const std = `${month}/${day}/${year}`; // MM/DD/YYYY — Azul's expected format
+  return `${AZUL_RESULTS}?c[0].ds=${origin}&c[0].std=${std}&c[0].as=${destination}&p[0].t=ADT&p[0].c=${passengers}&p[0].cp=false&f.dl=3&f.dr=3&cc=${currency}`;
+}
 
 // ── Main entry ────────────────────────────────────────────────────────────────
 
@@ -107,45 +116,49 @@ async function searchRoute(
   try {
     logger.info({ origin, destination, startDate, endDate }, 'Opening search page');
 
-    await page.goto(AZUL_HOME, { waitUntil: 'load', timeout: 60_000 });
-    await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
-    await humanDelay(2_000, 3_500);
+    // ── Primary path: direct URL navigation (up to 3 attempts) ───────────────
+    let firstLoaded = false;
+    const directOk = await tryDirectNavigation(page, origin, destination, startDate, params.passengers);
 
-    // Warm-up: wait until page context is ready for evaluation (rebrowser race condition fix)
-    await waitForEvalReady(page);
-    logger.debug('Page loaded and context ready');
+    if (directOk) {
+      firstLoaded = await waitForResults(page);
+      await saveSnapshot(page, params.runDir, `${origin}-${destination}-${startDate}-results`);
+    } else {
+      // ── Fallback: home page + form fill ───────────────────────────────────
+      logger.info({ origin, destination }, 'Direct URL failed — falling back to form fill');
 
-    await checkForBlock(page);
-    await acceptCookies(page);
-    // Let any post-cookie reload/navigation settle
-    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
-    await humanDelay(800, 1_200);
-    await hideOnetrust(page);
-    await waitForSearchForm(page);
-    logger.debug('Form ready');
-    await saveSnapshot(page, params.runDir, `${origin}-${destination}-home`);
-
-    // Fill form with the START date of the range
-    await fillSearchForm(page, origin, destination, startDate, params.passengers);
-
-    // Wait for results page to load
-    const firstLoaded = await waitForResults(page);
-    await saveSnapshot(page, params.runDir, `${origin}-${destination}-${startDate}-results`);
+      await page.goto(AZUL_HOME, { waitUntil: 'load', timeout: 60_000 });
+      await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
+      await humanDelay(2_000, 3_500);
+      await waitForEvalReady(page);
+      await checkForBlock(page);
+      await acceptCookies(page);
+      await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+      await humanDelay(800, 1_200);
+      await hideOnetrust(page);
+      await waitForSearchForm(page);
+      logger.debug('Form ready');
+      await saveSnapshot(page, params.runDir, `${origin}-${destination}-home`);
+      await fillSearchForm(page, origin, destination, startDate, params.passengers);
+      firstLoaded = await waitForResults(page);
+      await saveSnapshot(page, params.runDir, `${origin}-${destination}-${startDate}-results`);
+    }
     const dates = [...dateRange(startDate, endDate)];
 
     for (let i = 0; i < dates.length; i++) {
       const date = dates[i]!;
 
-      // First date is already displayed after form submission
       if (i === 0) {
+        // First date already loaded by tryDirectNavigation (or form fill)
         if (!firstLoaded) {
           logger.info({ date, origin, destination }, 'No flights for start date — skipping');
           continue;
         }
       } else {
-        const navigated = await navigateCalendarToDate(page, date);
-        if (!navigated) {
-          logger.warn({ date }, 'Could not navigate to date — skipping');
+        // Navigate directly to each subsequent date's URL
+        const ok = await tryDirectNavigation(page, origin, destination, date, params.passengers);
+        if (!ok) {
+          logger.warn({ date, origin, destination }, 'Direct URL failed for date — skipping');
           continue;
         }
         const loaded = await waitForResults(page);
@@ -204,6 +217,56 @@ async function waitForEvalReady(page: Page): Promise<void> {
     }
   }
   logger.warn('waitForEvalReady: context never stabilised — proceeding anyway');
+}
+
+// ── Direct URL navigation ─────────────────────────────────────────────────────
+
+// Tries navigating straight to the results deep-link up to 3 times.
+// Returns true if a results page loaded successfully; false if all attempts fail.
+async function tryDirectNavigation(
+  page: Page,
+  origin: string,
+  destination: string,
+  date: string,
+  passengers: number,
+): Promise<boolean> {
+  const url = buildSearchUrl(origin, destination, date, 'BRL', passengers);
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    logger.debug({ attempt, origin, destination, date }, 'Trying direct URL navigation');
+    try {
+      await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
+      await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
+      await humanDelay(1_000, 2_000);
+      await waitForEvalReady(page);
+      await checkForBlock(page);
+      await acceptCookies(page);
+      await hideOnetrust(page);
+
+      // Verify we landed on the results page — not silently redirected to home
+      const onResults = await page.evaluate(() =>
+        window.location.pathname.includes('selecao-voo') ||
+        document.querySelector('div.flight-card') !== null ||
+        document.querySelector('p.results') !== null ||
+        document.querySelector('.booking-calendar__cards') !== null,
+      ).catch(() => false);
+
+      if (!onResults) {
+        logger.warn({ attempt }, 'Direct navigation redirected away from results — retrying');
+        if (attempt < 3) await humanDelay(2_000, 3_000);
+        continue;
+      }
+
+      logger.info({ origin, destination, date, attempt }, 'Direct URL navigation succeeded');
+      return true;
+    } catch (err) {
+      logger.warn({ attempt, err: String(err).slice(0, 120) }, 'Direct URL navigation attempt failed');
+      if (attempt < 3) await humanDelay(2_000, 3_000);
+    }
+  }
+
+  logger.warn({ origin, destination, date }, 'All direct URL attempts failed — will use form fill');
+  return false;
 }
 
 // ── Bot detection ─────────────────────────────────────────────────────────────
