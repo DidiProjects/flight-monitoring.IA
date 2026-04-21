@@ -155,13 +155,21 @@ async function searchRoute(
           continue;
         }
       } else {
-        // Navigate directly to each subsequent date's URL
+        // Primary: direct URL navigation for this specific date
+        let loaded: boolean;
         const ok = await tryDirectNavigation(page, origin, destination, date, params.passengers);
-        if (!ok) {
-          logger.warn({ date, origin, destination }, 'Direct URL failed for date — skipping');
-          continue;
+        if (ok) {
+          loaded = await waitForResults(page);
+        } else {
+          // Fallback: calendar navigation (only works if still on the results page)
+          logger.warn({ date }, 'Direct URL failed — trying calendar navigation');
+          const navigated = await navigateCalendarToDate(page, date);
+          if (!navigated) {
+            logger.warn({ date, origin, destination }, 'Calendar navigation also failed — skipping date');
+            continue;
+          }
+          loaded = await waitForResults(page);
         }
-        const loaded = await waitForResults(page);
         await saveSnapshot(page, params.runDir, `${origin}-${destination}-${date}-results`);
         if (!loaded) {
           logger.info({ date, origin, destination }, 'No flights for this date — skipping');
