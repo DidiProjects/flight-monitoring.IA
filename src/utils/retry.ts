@@ -33,7 +33,7 @@ export async function withRetry<T>(
 
       logger.warn(
         { attempt, maxAttempts, delayMs: Math.round(delay), label },
-        `Attempt ${attempt} failed — retrying in ${(delay / 1000).toFixed(1)}s`,
+        `Attempt ${attempt} failed, retrying in ${(delay / 1000).toFixed(1)}s`,
       );
 
       await sleep(delay);

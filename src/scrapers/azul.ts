@@ -14,7 +14,7 @@ import { humanDelay } from '../browser/human.ts';
 import type { FlightOffer, FlightFares, SearchParams } from '../types/index.ts';
 
 // ── Airport timezone offsets ──────────────────────────────────────────────────
-// Static offsets (summer/DST not auto-adjusted — accurate enough for itinerary display)
+// Static offsets (summer/DST not auto-adjusted, accurate enough for itinerary display)
 const AIRPORT_TZ: Record<string, string> = {
   // Brazil BRT -03:00
   GRU: '-03:00', CGH: '-03:00', VCP: '-03:00', GIG: '-03:00',
@@ -51,7 +51,7 @@ const AZUL_RESULTS = 'https://www.voeazul.com.br/br/pt/home/selecao-voo';
 // date: "YYYY-MM-DD", currency: "BRL" | "PTS"
 function buildSearchUrl(origin: string, destination: string, date: string, currency: 'BRL' | 'PTS', passengers: number): string {
   const [year, month, day] = date.split('-');
-  const std = `${month}/${day}/${year}`; // MM/DD/YYYY — Azul's expected format
+  const std = `${month}/${day}/${year}`; // MM/DD/YYYY, Azul's expected format
   return `${AZUL_RESULTS}?c[0].ds=${origin}&c[0].std=${std}&c[0].as=${destination}&p[0].t=ADT&p[0].c=${passengers}&p[0].cp=false&f.dl=3&f.dr=3&cc=${currency}`;
 }
 
@@ -125,7 +125,7 @@ async function searchRoute(
       await saveSnapshot(page, params.runDir, `${origin}-${destination}-${startDate}-results`);
     } else {
       // ── Fallback: home page + form fill ───────────────────────────────────
-      logger.info({ origin, destination }, 'Direct URL failed — falling back to form fill');
+      logger.info({ origin, destination }, 'Direct URL failed, falling back to form fill');
 
       await page.goto(AZUL_HOME, { waitUntil: 'load', timeout: 60_000 });
       await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
@@ -151,7 +151,7 @@ async function searchRoute(
       if (i === 0) {
         // First date already loaded by tryDirectNavigation (or form fill)
         if (!firstLoaded) {
-          logger.info({ date, origin, destination }, 'No flights for start date — skipping');
+          logger.info({ date, origin, destination }, 'No flights for start date, skipping');
           continue;
         }
       } else {
@@ -162,17 +162,17 @@ async function searchRoute(
           loaded = await waitForResults(page);
         } else {
           // Fallback: calendar navigation (only works if still on the results page)
-          logger.warn({ date }, 'Direct URL failed — trying calendar navigation');
+          logger.warn({ date }, 'Direct URL failed, trying calendar navigation');
           const navigated = await navigateCalendarToDate(page, date);
           if (!navigated) {
-            logger.warn({ date, origin, destination }, 'Calendar navigation also failed — skipping date');
+            logger.warn({ date, origin, destination }, 'Calendar navigation also failed, skipping date');
             continue;
           }
           loaded = await waitForResults(page);
         }
         await saveSnapshot(page, params.runDir, `${origin}-${destination}-${date}-results`);
         if (!loaded) {
-          logger.info({ date, origin, destination }, 'No flights for this date — skipping');
+          logger.info({ date, origin, destination }, 'No flights for this date, skipping');
           continue;
         }
       }
@@ -213,7 +213,7 @@ async function searchRoute(
 
 // ── Context warm-up ──────────────────────────────────────────────────────────
 
-// Waits until page.evaluate succeeds — fixes rebrowser-playwright race condition
+// Waits until page.evaluate succeeds, fixes rebrowser-playwright race condition
 // when the page navigates during initial load and the CDP context gets destroyed.
 async function waitForEvalReady(page: Page): Promise<void> {
   for (let i = 0; i < 8; i++) {
@@ -224,7 +224,7 @@ async function waitForEvalReady(page: Page): Promise<void> {
       await page.waitForTimeout(800);
     }
   }
-  logger.warn('waitForEvalReady: context never stabilised — proceeding anyway');
+  logger.warn('waitForEvalReady: context never stabilised, proceeding anyway');
 }
 
 // ── Direct URL navigation ─────────────────────────────────────────────────────
@@ -251,7 +251,7 @@ async function tryDirectNavigation(
       await acceptCookies(page);
       await hideOnetrust(page);
 
-      // Verify we landed on the results page — not silently redirected to home
+      // Verify we landed on the results page, not silently redirected to home
       const onResults = await page.evaluate(() =>
         window.location.pathname.includes('selecao-voo') ||
         document.querySelector('div.flight-card') !== null ||
@@ -260,7 +260,7 @@ async function tryDirectNavigation(
       ).catch(() => false);
 
       if (!onResults) {
-        logger.warn({ attempt }, 'Direct navigation redirected away from results — retrying');
+        logger.warn({ attempt }, 'Direct navigation redirected away from results, retrying');
         if (attempt < 3) await humanDelay(2_000, 3_000);
         continue;
       }
@@ -273,7 +273,7 @@ async function tryDirectNavigation(
     }
   }
 
-  logger.warn({ origin, destination, date }, 'All direct URL attempts failed — will use form fill');
+  logger.warn({ origin, destination, date }, 'All direct URL attempts failed, will use form fill');
   return false;
 }
 
@@ -307,7 +307,7 @@ async function waitForSearchForm(page: Page): Promise<void> {
     .locator('input[aria-label*="Origem" i]')
     .first()
     .waitFor({ state: 'attached', timeout: 20_000 })
-    .catch(() => logger.warn('Search form attach timeout — proceeding'));
+    .catch(() => logger.warn('Search form attach timeout, proceeding'));
 }
 
 // Converts "YYYY-MM-DD" → "DDMMYYYY" (Azul date input format)
@@ -327,7 +327,7 @@ async function fillSearchForm(
 ): Promise<void> {
   logger.debug({ origin, destination, date }, 'Filling search form');
 
-  // Origin — opacity:0 input, click via parent container coords
+  // Origin, opacity:0 input, click via parent container coords
   await clickVisibleContainer(page, 'input[aria-label*="Origem" i]');
   await humanDelay(300, 600);
   await page.keyboard.type(origin, { delay: 80 + Math.random() * 80 });
@@ -343,7 +343,7 @@ async function fillSearchForm(
   await selectAirportOption(page, destination);
   await humanDelay(400, 800);
 
-  // Date — type DDMMYYYY directly (no modal opens)
+  // Date, type DDMMYYYY directly (no modal opens)
   await clickVisibleContainer(page, 'input[aria-label*="Datas" i]');
   await humanDelay(300, 500);
   await page.keyboard.type(toDDMMYYYY(date), { delay: 100 + Math.random() * 50 });
@@ -414,7 +414,7 @@ async function selectAirportOption(page: Page, code: string): Promise<void> {
   }, code);
 
   if (!clicked) {
-    logger.warn({ code }, 'Autocomplete option not found — pressing Enter');
+    logger.warn({ code }, 'Autocomplete option not found, pressing Enter');
     await page.keyboard.press('Enter');
   }
 }
@@ -451,27 +451,27 @@ async function setPassengers(page: Page, count: number): Promise<void> {
 // ── Wait for results ──────────────────────────────────────────────────────────
 
 // Returns true if results loaded, false if empty-state (no flights available).
-// Uses locator polling — avoids page.waitForFunction serialization issues with tsx.
+// Uses locator polling, avoids page.waitForFunction serialization issues with tsx.
 async function waitForResults(page: Page): Promise<boolean> {
   const deadline = Date.now() + 35_000;
 
   while (Date.now() < deadline) {
     if ((await page.locator('p.results').count().catch(() => 0)) > 0) {
-      logger.debug('Results ready — p.results found');
+      logger.debug('Results ready, p.results found');
       return true;
     }
     if ((await page.locator('p.css-1wdbheb').count().catch(() => 0)) > 0) {
-      logger.info('Empty result state — no flights available for this date');
+      logger.info('Empty result state, no flights available for this date');
       return false;
     }
     if ((await page.locator('.booking-calendar__cards').count().catch(() => 0)) > 0) {
-      logger.debug('Results ready — booking-calendar visible');
+      logger.debug('Results ready, booking-calendar visible');
       return true;
     }
     await page.waitForTimeout(500);
   }
 
-  logger.warn('waitForResults timed out — proceeding');
+  logger.warn('waitForResults timed out, proceeding');
   return true;
 }
 
@@ -625,7 +625,7 @@ async function collectAllFares(
   const ptsCards: PtsCard[] = await page.evaluate(() => {
     const cards = Array.from(document.querySelectorAll<HTMLElement>('div.flight-card[id]'));
     return cards.map(card => {
-      // In Points view the same h4[data-test-id="fare-price"] is reused — only content changes
+      // In Points view the same h4[data-test-id="fare-price"] is reused, only content changes
       const fareEl = card.querySelector<HTMLElement>('h4[data-test-id="fare-price"]');
       const fareText = (fareEl?.textContent ?? '').replace(/\s+/g, ' ').trim();
 

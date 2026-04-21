@@ -71,7 +71,7 @@ jobs:
           npm start
           EOF
 
-      - name: AI fallback — auto-fix scraper
+      - name: AI fallback, auto-fix scraper
         if: failure()
         run: |
           ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} << 'EOF'

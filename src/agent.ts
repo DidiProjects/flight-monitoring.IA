@@ -1,5 +1,5 @@
 /**
- * AI Fallback Agent — auto-heals the Azul scraper when npm start fails.
+ * AI Fallback Agent, auto-heals the Azul scraper when npm start fails.
  *
  * Usage: npm run ai-fix -- [same args as npm start]
  *
@@ -7,7 +7,7 @@
  *  1. Reads the latest failed run for error context
  *  2. Runs a Claude agentic loop with bash/read/write tools
  *  3. Fixes src/scrapers/azul.ts, retests, commits on success
- *  4. Manages token budget — stops gracefully before hitting the limit
+ *  4. Manages token budget, stops gracefully before hitting the limit
  */
 
 import 'dotenv/config';
@@ -165,10 +165,10 @@ The Azul Airlines scraper (src/scrapers/azul.ts) just failed. Diagnose and fix i
 rerun "npm start ${originalArgs}" to verify, then commit the fix.
 
 ## Critical code rules
-1. NEVER use named functions inside page.evaluate() — tsx 4.x compiles with keepNames:true
+1. NEVER use named functions inside page.evaluate(), tsx 4.x compiles with keepNames:true
    which injects __name() that does not exist in browser context. Use iterative stack or
    anonymous arrows instead.
-2. Confirmed selectors are in memory/azul/dom-structure.md — update it if DOM changed.
+2. Confirmed selectors are in memory/azul/dom-structure.md, update it if DOM changed.
 3. Always save HTML snapshots to results/.../snapshots/ at key steps for diagnosis.
 
 ## After a successful run
@@ -202,7 +202,7 @@ async function main(): Promise<void> {
   const runInfo = findLatestErrorRun();
   const errorContext = runInfo
     ? `Run dir: ${runInfo.dir}\n\nExecution log:\n${runInfo.log}`
-    : 'No error log found — run npm start first to capture an error.';
+    : 'No error log found, run npm start first to capture an error.';
 
   // Pre-load key files into context
   const azulSrc  = readFileSafe('src/scrapers/azul.ts');
@@ -229,18 +229,18 @@ ${domMem}
 --- memory/azul/scraper-architecture.md ---
 ${archMem}
 
-Original npm start args: ${originalArgs || '(none — use env vars)'}
+Original npm start args: ${originalArgs || '(none, use env vars)'}
 
 Begin.`,
     },
   ];
 
-  console.log(`[ai-agent] Starting agentic loop — budget: ${TOKEN_BUDGET.toLocaleString()} tokens`);
+  console.log(`[ai-agent] Starting agentic loop, budget: ${TOKEN_BUDGET.toLocaleString()} tokens`);
 
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     remaining = TOKEN_BUDGET - usedTokens;
     if (remaining < STOP_TOKENS) {
-      console.log(`[ai-agent] Token budget low (${remaining} remaining) — requesting wrap-up`);
+      console.log(`[ai-agent] Token budget low (${remaining} remaining), requesting wrap-up`);
       messages.push({
         role: 'user',
         content: `Token budget is almost exhausted (${remaining} tokens left).
@@ -249,7 +249,7 @@ update memory files documenting what you found, and stop.`,
       });
     }
 
-    console.log(`[ai-agent] Iteration ${iter + 1}/${MAX_ITERS} — tokens used: ${usedTokens.toLocaleString()}`);
+    console.log(`[ai-agent] Iteration ${iter + 1}/${MAX_ITERS}, tokens used: ${usedTokens.toLocaleString()}`);
 
     const response = await client.messages.create({
       model:      MODEL,
@@ -270,7 +270,7 @@ update memory files documenting what you found, and stop.`,
     }
 
     if (response.stop_reason !== 'tool_use') {
-      console.log(`[ai-agent] Unexpected stop_reason: ${response.stop_reason} — stopping`);
+      console.log(`[ai-agent] Unexpected stop_reason: ${response.stop_reason}, stopping`);
       break;
     }
 

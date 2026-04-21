@@ -1,6 +1,6 @@
 ---
 name: Preferências e estilo de desenvolvimento do Diego
-description: Como o Diego quer trabalhar — autonomia, iteração, diagnóstico, comunicação
+description: Como o Diego quer trabalhar, autonomia, iteração, diagnóstico, comunicação
 type: feedback
 ---
 Trabalhar com máxima autonomia. Não interromper para confirmações a não ser em risco real de perda de dados irreversível.
@@ -23,11 +23,11 @@ O usuário fornece informações sobre a estrutura do DOM no README.md do projet
 
 **Why:** É a forma dele comunicar o que viu no DevTools sem precisar explicar verbalmente.
 
-**How to apply:** Sempre ler o README.md completo ao iniciar sessão — pode conter instruções técnicas novas sobre seletores, fluxos ou comportamento do site.
+**How to apply:** Sempre ler o README.md completo ao iniciar sessão, pode conter instruções técnicas novas sobre seletores, fluxos ou comportamento do site.
 
 ---
 
-Respostas curtas e diretas em português brasileiro. Não explicar o que foi feito — o usuário vê o diff.
+Respostas curtas e diretas em português brasileiro. Não explicar o que foi feito, o usuário vê o diff.
 
 **Why:** Preferência explícita do usuário.
 

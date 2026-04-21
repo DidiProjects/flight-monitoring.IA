@@ -3,7 +3,7 @@ name: Arquitetura e fluxo do scraper Azul
 description: Stack, ordem exata do fluxo de automação, arquitetura de buscas, coleta de dados, estado atual do código
 type: project
 ---
-## Stack (atual — 2026-04-21)
+## Stack (atual, 2026-04-21)
 
 camoufox-js + playwright (firefox headless), TypeScript/tsx, pino logger, dotenv.
 - `import { firefox } from 'playwright'` + `import { launchOptions } from 'camoufox-js'`
@@ -13,10 +13,10 @@ camoufox-js + playwright (firefox headless), TypeScript/tsx, pino logger, dotenv
 ## Fluxo de automação (ordem exata)
 
 1. Navegar para `https://www.voeazul.com.br/br/pt/home`
-2. `waitForEvalReady()` — retenta evaluate até contexto estabilizar
-3. `checkForBlock()` — verifica se Akamai bloqueou
+2. `waitForEvalReady()`, retenta evaluate até contexto estabilizar
+3. `checkForBlock()`, verifica se Akamai bloqueou
 4. Aceitar cookies (`#onetrust-accept-btn-handler`) + force-hide overlay OneTrust
-5. `waitForSearchForm()` — aguarda `input[aria-label*="Origem"]`
+5. `waitForSearchForm()`, aguarda `input[aria-label*="Origem"]`
 6. `fillSearchForm()`:
    a. Clicar container pai do `input[aria-label*="Origem"]` → digitar código → clicar `button[role="option"]`
    b. Clicar container pai do `input[aria-label*="Destino"]` → digitar → clicar option
@@ -26,29 +26,29 @@ camoufox-js + playwright (firefox headless), TypeScript/tsx, pino logger, dotenv
 8. Para cada data no range:
    a. Se i > 0: `navigateCalendarToDate()` → click button com `aria-label` contendo "DD/MM"
    b. `waitForResults()`
-   c. `collectAllFares()` — coleta BRL + pontos + híbrido
+   c. `collectAllFares()`, coleta BRL + pontos + híbrido
 9. Após toda ida → nova page/context para rota de volta
 
-## collectAllFares — fluxo interno
+## collectAllFares, fluxo interno
 
-1. `setCurrencyView(page, 'Reais')` — garante view BRL
+1. `setCurrencyView(page, 'Reais')`, garante view BRL
 2. Extrair `brlCards` de `div.flight-card[id]`:
    - `h4.departure` → depTime, depIata (via `span.iata-day`)
    - `h4.arrival` → arrTime, arrIata
    - `button.duration[aria-label]` → durLabel (parse "X hora Y minuto")
    - `.flight-leg-info button` → legText (parse conexões + voo)
    - `h4[data-test-id="fare-price"]` → priceText
-3. `setCurrencyView(page, 'Pontos')` — switch para view pontos
+3. `setCurrencyView(page, 'Pontos')`, switch para view pontos
 4. Extrair `ptsCards` de `div.flight-card[id]`:
    - `h4[data-test-id="fare-price"]` → buscar "pontos" no textContent
    - `p.condition` → texto híbrido "ou X pontos + R$ Y"
 5. Merge por `card.id` → `FlightOffer[]`
 
-## setCurrencyView — detalhes importantes
+## setCurrencyView, detalhes importantes
 
 - Seletor correto: `.currencySelector button[value="${value}"]` (results section)
-- NÃO usar `button[value="score"].first()` — apanha o botão do painel esquerdo (search form), que não controla os cards
-- Após click: `waitForLoadState('networkidle', 8s)` — o site faz chamada API para pontos
+- NÃO usar `button[value="score"].first()`, apanha o botão do painel esquerdo (search form), que não controla os cards
+- Após click: `waitForLoadState('networkidle', 8s)`, o site faz chamada API para pontos
 - Wait adicional de 10s verificando `h4[data-test-id="fare-price"]` para "pontos" no textContent
 - Para rotas internacionais (ex: LIS↔CNF): pontos puro pode não estar disponível → h4 fica vazio → correto
 
