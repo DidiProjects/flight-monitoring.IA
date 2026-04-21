@@ -66,7 +66,7 @@ jobs:
           EMAIL_CC="${{ vars.EMAIL_CC }}" \
           EMAIL_SMTP_HOST="${{ vars.EMAIL_SMTP_HOST }}" \
           EMAIL_SMTP_PORT="${{ vars.EMAIL_SMTP_PORT }}" \
-          EMAIL_SMTP_USER="${{ vars.EMAIL_SMTP_USER }}" \
+          EMAIL_SMTP_USER="${{ secrets.EMAIL_SMTP_USER }}" \
           EMAIL_SMTP_PASSWORD="${{ secrets.EMAIL_SMTP_PASSWORD }}" \
           npm start
           EOF
