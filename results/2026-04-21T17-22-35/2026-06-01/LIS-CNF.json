@@ -1,0 +1,203 @@
+[
+  {
+    "date": "2026-06-01",
+    "flightNumber": "AD8901",
+    "origin": {
+      "iata": "LIS",
+      "timestamp": "2026-06-01T10:00:00+01:00"
+    },
+    "destination": {
+      "iata": "CNF",
+      "timestamp": "2026-06-01T19:30:00-03:00"
+    },
+    "durationMin": 810,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 3877.34,
+        "currency": "BRL"
+      },
+      "hybrid": {
+        "points": 22077,
+        "cash": 3614.76,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-06-01",
+    "flightNumber": "AD8901",
+    "origin": {
+      "iata": "LIS",
+      "timestamp": "2026-06-01T10:00:00+01:00"
+    },
+    "destination": {
+      "iata": "CNF",
+      "timestamp": "2026-06-01T20:30:00-03:00"
+    },
+    "durationMin": 870,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 3877.34,
+        "currency": "BRL"
+      },
+      "hybrid": {
+        "points": 16100,
+        "cash": 3293.46,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-06-01",
+    "flightNumber": "AD8901",
+    "origin": {
+      "iata": "LIS",
+      "timestamp": "2026-06-01T10:00:00+01:00"
+    },
+    "destination": {
+      "iata": "CNF",
+      "timestamp": "2026-06-01T22:55:00-03:00"
+    },
+    "durationMin": 1015,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 3945.01,
+        "currency": "BRL"
+      },
+      "hybrid": {
+        "points": 22473,
+        "cash": 3679.76,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-06-01",
+    "flightNumber": "AD8753",
+    "origin": {
+      "iata": "LIS",
+      "timestamp": "2026-06-01T13:00:00+01:00"
+    },
+    "destination": {
+      "iata": "CNF",
+      "timestamp": "2026-06-01T22:55:00-03:00"
+    },
+    "durationMin": 835,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 4322.48,
+        "currency": "BRL"
+      },
+      "hybrid": {
+        "points": 24948,
+        "cash": 4037.76,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-06-01",
+    "flightNumber": "AD8803",
+    "origin": {
+      "iata": "OPO",
+      "timestamp": "2026-06-01T13:15:00+01:00"
+    },
+    "destination": {
+      "iata": "CNF",
+      "timestamp": "2026-06-01T22:55:00-03:00"
+    },
+    "durationMin": 820,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 3359.3,
+        "currency": "BRL"
+      },
+      "hybrid": {
+        "points": 19156,
+        "cash": 3120.31,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-06-01",
+    "flightNumber": "AD7457",
+    "origin": {
+      "iata": "OPO",
+      "timestamp": "2026-06-01T05:05:00+01:00"
+    },
+    "destination": {
+      "iata": "CNF",
+      "timestamp": "2026-06-01T19:30:00-03:00"
+    },
+    "durationMin": 1105,
+    "stops": 2,
+    "fares": {
+      "brl": {
+        "amount": 10129.26,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-06-01",
+    "flightNumber": "AD7457",
+    "origin": {
+      "iata": "OPO",
+      "timestamp": "2026-06-01T05:05:00+01:00"
+    },
+    "destination": {
+      "iata": "CNF",
+      "timestamp": "2026-06-01T20:30:00-03:00"
+    },
+    "durationMin": 1165,
+    "stops": 2,
+    "fares": {
+      "brl": {
+        "amount": 10129.26,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-06-01",
+    "flightNumber": "AD7458",
+    "origin": {
+      "iata": "OPO",
+      "timestamp": "2026-06-01T09:00:00+01:00"
+    },
+    "destination": {
+      "iata": "CNF",
+      "timestamp": "2026-06-01T22:55:00-03:00"
+    },
+    "durationMin": 1075,
+    "stops": 2,
+    "fares": {
+      "brl": {
+        "amount": 8919.31,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  }
+]
