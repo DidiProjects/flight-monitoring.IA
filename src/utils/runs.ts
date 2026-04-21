@@ -23,7 +23,10 @@ export async function createRun(params: SearchParams): Promise<RunContext> {
     `Run started : ${new Date().toISOString()}`,
     `Origin      : ${params.origin}`,
     `Destination : ${params.destination}`,
-    `Target      : ${params.target} (margin ${(params.margin * 100).toFixed(0)}%)`,
+    `Target BRL  : ${params.targets.brl ?? '--'}`,
+    `Target PTS  : ${params.targets.pts ?? '--'}`,
+    `Target HYB  : pts=${params.targets.hybPts ?? '--'} brl=${params.targets.hybBrl ?? '--'}`,
+    `Margin      : ${(params.margin * 100).toFixed(0)}%`,
     `Outbound    : ${params.outboundStart}${params.outboundEnd ? ` → ${params.outboundEnd}` : ''}`,
     params.returnStart
       ? `Return      : ${params.returnStart}${params.returnEnd ? ` → ${params.returnEnd}` : ''}`

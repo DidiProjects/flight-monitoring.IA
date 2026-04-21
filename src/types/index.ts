@@ -1,7 +1,14 @@
+export interface Targets {
+  brl?: number;
+  pts?: number;
+  hybPts?: number; // max points component of hybrid fare
+  hybBrl?: number; // max cash component of hybrid fare (BRL)
+}
+
 export interface SearchParams {
   origin: string;
   destination: string;
-  target: number;
+  targets: Targets;
   margin: number;
   outboundStart: string;   // YYYY-MM-DD
   outboundEnd?: string;
@@ -44,4 +51,17 @@ export interface FlightOffer {
   fares: FlightFares;
   isReturn: boolean;
   withinTarget: boolean;
+}
+
+export function computeWithinTarget(offer: FlightOffer, targets: Targets, margin: number): boolean {
+  const m = 1 + margin;
+  if (targets.brl != null && offer.fares.brl && offer.fares.brl.amount <= targets.brl * m) return true;
+  if (targets.pts != null && offer.fares.points && offer.fares.points.amount <= targets.pts * m) return true;
+  if ((targets.hybPts != null || targets.hybBrl != null) && offer.fares.hybrid) {
+    const h = offer.fares.hybrid;
+    const ptsOk = targets.hybPts == null || h.points <= targets.hybPts * m;
+    const brlOk = targets.hybBrl == null || h.cash   <= targets.hybBrl * m;
+    if (ptsOk && brlOk) return true;
+  }
+  return false;
 }

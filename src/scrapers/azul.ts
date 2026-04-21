@@ -87,8 +87,6 @@ export async function searchFlights(params: SearchParams): Promise<FlightOffer[]
     await browser.close();
   }
 
-  const threshold = params.target * (1 + params.margin);
-  results.forEach(o => { o.withinTarget = (o.fares.brl?.amount ?? Infinity) <= threshold; });
   return results;
 }
 

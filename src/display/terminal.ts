@@ -4,22 +4,20 @@ import { formatDuration } from '../utils/dates.ts';
 import type { FlightOffer, SearchParams } from '../types/index.ts';
 
 export function displayResults(params: SearchParams, results: FlightOffer[]): void {
-  const threshold = params.target * (1 + params.margin);
-
-  printHeader(params, threshold);
+  printHeader(params);
 
   const outbound = results.filter(r => !r.isReturn);
   const returns  = results.filter(r => r.isReturn);
 
   if (outbound.length > 0) {
-    printTable(outbound, `Outbound  ${params.origin} → ${params.destination}`, params.target, threshold);
+    printTable(outbound, `Outbound  ${params.origin} → ${params.destination}`, params);
   } else {
     console.log(chalk.yellow('  No outbound Azul flights found.\n'));
   }
 
   if (params.returnStart) {
     if (returns.length > 0) {
-      printTable(returns, `Return  ${params.destination} → ${params.origin}`, params.target, threshold);
+      printTable(returns, `Return  ${params.destination} → ${params.origin}`, params);
     } else {
       console.log(chalk.yellow('  No return Azul flights found.\n'));
     }
@@ -28,16 +26,34 @@ export function displayResults(params: SearchParams, results: FlightOffer[]): vo
   printSummary(results);
 }
 
-function printHeader(params: SearchParams, threshold: number): void {
+function printHeader(params: SearchParams): void {
   const bar = chalk.blue('─'.repeat(80));
   console.log(`\n${bar}`);
   console.log(chalk.bold.blue('  Azul Flight Price Tracker'));
   console.log(bar);
   console.log(`  Route      : ${chalk.bold(`${params.origin} → ${params.destination}`)}`);
-  console.log(
-    `  Target     : ${chalk.bold.green(`R$ ${params.target.toLocaleString('pt-BR')}`)}` +
-    `  |  Margin (${(params.margin * 100).toFixed(0)}%): ${chalk.yellow(`R$ ${threshold.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`)}`,
-  );
+  const { targets, margin } = params;
+  if (targets.brl != null) {
+    const thr = targets.brl * (1 + margin);
+    console.log(`  Target BRL : ${chalk.bold.green(`R$ ${targets.brl.toLocaleString('pt-BR')}`)}  |  Margem: ${chalk.yellow(`R$ ${thr.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`)}`);
+  }
+  if (targets.pts != null) {
+    const thr = Math.round(targets.pts * (1 + margin));
+    console.log(`  Target PTS : ${chalk.bold.green(`${targets.pts.toLocaleString('pt-BR')} pts`)}  |  Margem: ${chalk.yellow(`${thr.toLocaleString('pt-BR')} pts`)}`);
+  }
+  if (targets.hybPts != null || targets.hybBrl != null) {
+    const parts: string[] = [];
+    if (targets.hybPts != null) {
+      const thr = Math.round(targets.hybPts * (1 + margin));
+      parts.push(`${chalk.bold.green(`${targets.hybPts.toLocaleString('pt-BR')} pts`)}  |  Margem: ${chalk.yellow(`${thr.toLocaleString('pt-BR')} pts`)}`);
+    }
+    if (targets.hybBrl != null) {
+      const thr = targets.hybBrl * (1 + margin);
+      parts.push(`${chalk.bold.green(`R$ ${targets.hybBrl.toLocaleString('pt-BR')}`)}  |  Margem: ${chalk.yellow(`R$ ${thr.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`)}`);
+    }
+    console.log(`  Target HYB : ${parts.join('  +  ')}`);
+  }
+  console.log(`  Margin     : ${(margin * 100).toFixed(0)}%`);
   console.log(`  Passengers : ${params.passengers}`);
   console.log();
 }
@@ -45,9 +61,11 @@ function printHeader(params: SearchParams, threshold: number): void {
 function printTable(
   offers: FlightOffer[],
   title: string,
-  target: number,
-  threshold: number,
+  params: SearchParams,
 ): void {
+  const { targets, margin } = params;
+  const brlThreshold = targets.brl != null ? targets.brl * (1 + margin) : undefined;
+  const ptsThreshold = targets.pts != null ? targets.pts * (1 + margin) : undefined;
   console.log(chalk.bold.cyan(`  ${title}`));
   console.log();
 
@@ -73,16 +91,23 @@ function printTable(
   );
 
   for (const o of sorted) {
-    const brl = o.fares.brl?.amount ?? 0;
-    const [priceStr, statusStr] = formatPrice(brl, target, threshold);
+    const brlAmt = o.fares.brl?.amount ?? 0;
+    const brlStr = brlAmt > 0
+      ? formatBrl(brlAmt, brlThreshold)
+      : chalk.dim('--');
 
-    const ptsStr = o.fares.points
-      ? o.fares.points.amount.toLocaleString('pt-BR') + ' pts'
-      : '--';
+    const ptsAmt = o.fares.points?.amount ?? 0;
+    const ptsStr = ptsAmt > 0
+      ? formatPts(ptsAmt, ptsThreshold)
+      : chalk.dim('--');
 
     const hybStr = o.fares.hybrid
       ? `${o.fares.hybrid.points.toLocaleString('pt-BR')}pts\n+ R$${o.fares.hybrid.cash.toLocaleString('pt-BR')}`
-      : '--';
+      : chalk.dim('--');
+
+    const statusStr = o.withinTarget
+      ? chalk.bold.green('ok')
+      : chalk.dim.red('acima');
 
     table.push([
       chalk.dim(o.date),
@@ -91,7 +116,7 @@ function printTable(
       `${o.destination.timestamp.slice(11, 16)} ${o.destination.iata}`,
       o.durationMin > 0 ? formatDuration(o.durationMin) : '--',
       String(o.stops),
-      priceStr,
+      brlStr,
       ptsStr,
       hybStr,
       statusStr,
@@ -102,12 +127,18 @@ function printTable(
   console.log();
 }
 
-function formatPrice(price: number, target: number, threshold: number): [string, string] {
-  if (price <= 0) return [chalk.dim('--'), chalk.dim('--')];
-  const formatted = `R$ ${price.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`;
-  if (price <= target)     return [chalk.bold.green(formatted), chalk.bold.green('abaixo')];
-  if (price <= threshold)  return [chalk.yellow(formatted), chalk.yellow('na margem')];
-  return [chalk.dim(formatted), chalk.dim.red('acima')];
+function formatBrl(amount: number, threshold?: number): string {
+  const s = `R$ ${amount.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`;
+  if (threshold == null) return chalk.dim(s);
+  if (amount <= threshold) return chalk.bold.green(s);
+  return chalk.dim(s);
+}
+
+function formatPts(amount: number, threshold?: number): string {
+  const s = `${amount.toLocaleString('pt-BR')} pts`;
+  if (threshold == null) return chalk.dim(s);
+  if (amount <= threshold) return chalk.bold.green(s);
+  return chalk.dim(s);
 }
 
 function printSummary(results: FlightOffer[]): void {
@@ -115,6 +146,6 @@ function printSummary(results: FlightOffer[]): void {
   console.log(
     chalk.grey('  ─'.repeat(40)) + '\n' +
     `  ${chalk.bold(results.length)} voo(s) encontrado(s)  |  ` +
-    chalk.bold.green(`${within}`) + ' dentro do target / margem\n',
+    chalk.bold.green(`${within}`) + ' dentro do target\n',
   );
 }
