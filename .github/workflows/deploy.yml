@@ -26,11 +26,11 @@ jobs:
 
       - name: Sync project to server
         run: |
-          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} \
+          ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} \
             "mkdir -p /home/diego/flight-tracker"
 
           rsync -az \
-            -e "ssh -o StrictHostKeyChecking=no -p 1024" \
+            -e "ssh -o StrictHostKeyChecking=no" \
             --exclude='.git' \
             --exclude='node_modules' \
             --exclude='.env' \
@@ -40,14 +40,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} << 'EOF'
           cd /home/diego/flight-tracker
           npm ci
           EOF
 
       - name: Run flight search
         run: |
-          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} << 'EOF'
           cd /home/diego/flight-tracker
           RESULTS_DIR=./results \
           FLIGHT_ORIGIN="${{ vars.FLIGHT_ORIGIN }}" \
@@ -77,7 +77,7 @@ jobs:
       - name: AI fallback, auto-fix scraper
         if: failure()
         run: |
-          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} << 'EOF'
           cd /home/diego/flight-tracker
           RESULTS_DIR=./results \
           FLIGHT_ORIGIN="${{ vars.FLIGHT_ORIGIN }}" \
