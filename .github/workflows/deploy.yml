@@ -70,8 +70,15 @@ jobs:
       - name: Shutdown Windows VM
         if: always()
         run: |
-          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} \
-            "virsh --connect qemu:///system shutdown windows10 2>/dev/null || true"
+          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} "
+            virsh --connect qemu:///system shutdown windows10 2>/dev/null || true
+            for i in \$(seq 1 18); do
+              sleep 10
+              STATE=\$(virsh --connect qemu:///system domstate windows10 2>/dev/null)
+              if [ \"\$STATE\" = \"desligado\" ]; then exit 0; fi
+            done
+            virsh --connect qemu:///system destroy windows10 2>/dev/null || true
+          "
 
       - name: AI fallback, auto-fix scraper
         if: failure()
