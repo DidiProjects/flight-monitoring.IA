@@ -18,12 +18,19 @@ interface DirectionBest {
 }
 
 interface DailyState {
-  emailSentAt?: string;
   runCount: number;
   best: {
     outbound: DirectionBest;
     return: DirectionBest;
   };
+  // Tracks the amounts that were last emailed per direction.
+  // Re-send triggered whenever a direction gets a strictly lower amount.
+  lastEmailed?: {
+    outbound?: number;
+    return?: number;
+    type?: 'brl' | 'pts' | 'hyb';
+  };
+  bestOfDayEmailSentAt?: string;
 }
 
 interface AppState {
@@ -52,7 +59,6 @@ function getDay(state: AppState, date: string): DailyState {
   if (!state.days[date]) {
     state.days[date] = { runCount: 0, best: { outbound: {}, return: {} } };
   }
-  // Migrate old structure that didn't have outbound/return split
   const day = state.days[date]!;
   if (!day.best.outbound) (day.best as any).outbound = {};
   if (!day.best.return)   (day.best as any).return   = {};
@@ -86,13 +92,43 @@ export function updateBestOffers(state: AppState, date: string, offers: FlightOf
   }
 }
 
-export function emailAlreadySentToday(state: AppState, date: string): boolean {
-  return !!state.days[date]?.emailSentAt;
+// Returns true if outbound or return amount is strictly lower than what was last emailed.
+// Also returns true if nothing has been emailed yet (first hit).
+export function hasOfferImproved(
+  state: AppState,
+  date: string,
+  outboundAmount: number | undefined,
+  returnAmount: number | undefined,
+): boolean {
+  const emailed = state.days[date]?.lastEmailed;
+  if (!emailed) return true;
+
+  if (outboundAmount != null && (emailed.outbound == null || outboundAmount < emailed.outbound)) return true;
+  if (returnAmount   != null && (emailed.return   == null || returnAmount   < emailed.return))   return true;
+  return false;
 }
 
-export function markEmailSent(state: AppState, date: string): void {
+export function markEmailed(
+  state: AppState,
+  date: string,
+  outboundAmount: number | undefined,
+  returnAmount: number | undefined,
+  type: 'brl' | 'pts' | 'hyb',
+): void {
   const day = getDay(state, date);
-  day.emailSentAt = new Date().toISOString();
+  day.lastEmailed = {
+    outbound: outboundAmount ?? day.lastEmailed?.outbound,
+    return:   returnAmount   ?? day.lastEmailed?.return,
+    type,
+  };
+}
+
+export function bestOfDayAlreadySent(state: AppState, date: string): boolean {
+  return !!state.days[date]?.bestOfDayEmailSentAt;
+}
+
+export function markBestOfDaySent(state: AppState, date: string): void {
+  getDay(state, date).bestOfDayEmailSentAt = new Date().toISOString();
 }
 
 export function getOffersWithinTarget(
