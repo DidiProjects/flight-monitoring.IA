@@ -15,7 +15,12 @@ export function* dateRange(start: string, end?: string): Generator<string> {
 
 /** Format minutes into "Xh YYm" */
 export function formatDuration(minutes: number): string {
-  const h = Math.floor(minutes / 60);
+  const d = Math.floor(minutes / 1440);
+  const h = Math.floor((minutes % 1440) / 60);
   const m = minutes % 60;
-  return `${h}h ${String(m).padStart(2, '0')}m`;
+  const parts = [];
+  if (d > 0) parts.push(`${d}d`);
+  parts.push(`${h}h`);
+  parts.push(`${String(m).padStart(2, '0')}m`);
+  return parts.join(' ');
 }

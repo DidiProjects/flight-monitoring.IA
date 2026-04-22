@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { Command } from 'commander';
 import ora from 'ora';
 import { searchFlights } from './scrapers/azul.ts';
-import { displayResults } from './display/terminal.ts';
+import { displayResults, printBestResults } from './display/terminal.ts';
 import { setLogLevel } from './utils/logger.ts';
 import { createRun, saveResults, pruneOldRuns } from './utils/runs.ts';
 import { computeWithinTarget } from './types/index.ts';
@@ -136,19 +136,25 @@ try {
   run.log(`Search complete, ${results.length} offer(s) found`);
   await saveResults(run, params, results);
 
+  // Always load + update state so accumulated best is available for display
+  const today = todayStr();
+  const state = await loadState();
+  updateBestOffers(state, today, results, targets);
+
   if (results.length === 0) {
     console.log('\n  No Azul flights found for the given parameters.\n');
   } else {
     displayResults(params, results);
+    const dayState = state.days[today];
+    if (dayState) {
+      printBestResults(params, dayState.best.outbound, dayState.best.return);
+    }
   }
 
   // ── Email logic ─────────────────────────────────────────────────────────────
   const emailEnabled = env['EMAIL_ENABLED'] === 'true';
   if (emailEnabled && results.length > 0) {
-    const today = todayStr();
-    const state = await loadState();
     const runCount = incrementRun(state, today);
-    updateBestOffers(state, today, results, targets);
 
     const hasReturn = params.returnStart != null;
     const outboundResults = results.filter(o => !o.isReturn);
@@ -218,8 +224,9 @@ try {
       }
     }
 
-    await saveState(state);
   }
+
+  await saveState(state);
 
 } catch (err) {
   spinner.fail('Search failed');

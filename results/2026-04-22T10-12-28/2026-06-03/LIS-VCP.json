@@ -1,0 +1,196 @@
+[
+  {
+    "date": "2026-06-03",
+    "flightNumber": "AD8751",
+    "origin": {
+      "iata": "LIS",
+      "timestamp": "2026-06-03T10:00:00+01:00"
+    },
+    "destination": {
+      "iata": "VCP",
+      "timestamp": "2026-06-03T16:10:00-03:00"
+    },
+    "durationMin": 610,
+    "stops": 0,
+    "fares": {
+      "brl": {
+        "amount": 2723.45,
+        "currency": "BRL"
+      },
+      "points": {
+        "amount": 148000,
+        "currency": "PTS"
+      },
+      "hybrid": {
+        "points": 11850,
+        "cash": 2426.82,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-06-03",
+    "flightNumber": "AD8901",
+    "origin": {
+      "iata": "LIS",
+      "timestamp": "2026-06-03T13:00:00+01:00"
+    },
+    "destination": {
+      "iata": "VCP",
+      "timestamp": "2026-06-03T19:20:00-03:00"
+    },
+    "durationMin": 620,
+    "stops": 0,
+    "fares": {
+      "brl": {
+        "amount": 2958.41,
+        "currency": "BRL"
+      },
+      "points": {
+        "amount": 164000,
+        "currency": "PTS"
+      },
+      "hybrid": {
+        "points": 13150,
+        "cash": 2640.82,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-06-03",
+    "flightNumber": "AD7196",
+    "origin": {
+      "iata": "OPO",
+      "timestamp": "2026-06-03T07:00:00+01:00"
+    },
+    "destination": {
+      "iata": "VCP",
+      "timestamp": "2026-06-03T16:10:00-03:00"
+    },
+    "durationMin": 790,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 7853.42,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-06-03",
+    "flightNumber": "AD7196",
+    "origin": {
+      "iata": "OPO",
+      "timestamp": "2026-06-03T07:00:00+01:00"
+    },
+    "destination": {
+      "iata": "VCP",
+      "timestamp": "2026-06-03T19:20:00-03:00"
+    },
+    "durationMin": 980,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 7853.42,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-06-03",
+    "flightNumber": "AD7194",
+    "origin": {
+      "iata": "OPO • 03/06",
+      "timestamp": "2026-06-03T21:15:00+00:00"
+    },
+    "destination": {
+      "iata": "VCP • 04/06",
+      "timestamp": "2026-06-03T16:50:00+00:00"
+    },
+    "durationMin": 1415,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 7853.42,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-06-03",
+    "flightNumber": "AD7195",
+    "origin": {
+      "iata": "OPO • 03/06",
+      "timestamp": "2026-06-03T22:30:00+00:00"
+    },
+    "destination": {
+      "iata": "VCP • 04/06",
+      "timestamp": "2026-06-03T16:50:00+00:00"
+    },
+    "durationMin": 1340,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 7853.42,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-06-03",
+    "flightNumber": "AD7459",
+    "origin": {
+      "iata": "OPO",
+      "timestamp": "2026-06-03T10:00:00+01:00"
+    },
+    "destination": {
+      "iata": "VCP",
+      "timestamp": "2026-06-03T19:20:00-03:00"
+    },
+    "durationMin": 800,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 8470.2,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-06-03",
+    "flightNumber": "AD7193",
+    "origin": {
+      "iata": "OPO • 03/06",
+      "timestamp": "2026-06-03T18:00:00+00:00"
+    },
+    "destination": {
+      "iata": "VCP • 04/06",
+      "timestamp": "2026-06-03T16:50:00+00:00"
+    },
+    "durationMin": 170,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 8470.2,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": false,
+    "withinTarget": false
+  }
+]

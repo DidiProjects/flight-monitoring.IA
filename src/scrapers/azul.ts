@@ -664,10 +664,12 @@ async function collectAllFares(
     if (seen.has(b.cardId)) continue;
     seen.add(b.cardId);
 
-    // Duration from aria-label: "Tempo de duração: 13 hora 55 minuto. Ver detalhes"
-    const durMatch = b.durLabel.match(/(\d+)\s*hora[s]?[\s,]*(\d+)?\s*minuto/i);
+    // Duration from aria-label: "Tempo de duração: 1 dia 2 hora 50 minuto. Ver detalhes"
+    const durMatch = b.durLabel.match(/(?:(\d+)\s*dia[s]?\s*)?(?:(\d+)\s*hora[s]?\s*)?(?:(\d+)\s*minuto)?/i);
     const durationMin = durMatch
-      ? parseInt(durMatch[1]!) * 60 + (durMatch[2] ? parseInt(durMatch[2]!) : 0)
+      ? (durMatch[1] ? parseInt(durMatch[1]) * 1440 : 0)
+        + (durMatch[2] ? parseInt(durMatch[2]) * 60 : 0)
+        + (durMatch[3] ? parseInt(durMatch[3]) : 0)
       : 0;
 
     // Stops + flight number from leg text: "1 conexão    •  Voo 8751" or "Direto  •  Voo 1234"

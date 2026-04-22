@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import Table from 'cli-table3';
 import { formatDuration } from '../utils/dates.ts';
 import type { FlightOffer, SearchParams } from '../types/index.ts';
+import type { DirectionBest } from '../state/tracker.ts';
 
 export function displayResults(params: SearchParams, results: FlightOffer[]): void {
   printHeader(params);
@@ -148,4 +149,67 @@ function printSummary(results: FlightOffer[]): void {
     `  ${chalk.bold(results.length)} voo(s) encontrado(s)  |  ` +
     chalk.bold.green(`${within}`) + ' dentro do target\n',
   );
+}
+
+export function printBestResults(
+  params: SearchParams,
+  outboundBest: DirectionBest,
+  returnBest: DirectionBest,
+): void {
+  const bar = chalk.blue('─'.repeat(80));
+  console.log(`${bar}`);
+  console.log(chalk.bold.blue('  Melhores do Dia (acumulado)'));
+  console.log(bar);
+
+  const sections: Array<{ label: string; best: DirectionBest }> = [
+    { label: `Outbound  ${params.origin} → ${params.destination}`, best: outboundBest },
+  ];
+  if (params.returnStart) {
+    sections.push({ label: `Return  ${params.destination} → ${params.origin}`, best: returnBest });
+  }
+
+  for (const { label, best } of sections) {
+    if (!best.brl && !best.pts && !best.hyb) continue;
+    console.log(chalk.bold.cyan(`\n  ${label}`));
+
+    const table = new Table({
+      head: [
+        chalk.cyan('Tipo'),
+        chalk.cyan('Data'),
+        chalk.cyan('Voo'),
+        chalk.cyan('Dep.'),
+        chalk.cyan('Dur.'),
+        chalk.cyan('Preço'),
+      ],
+      style: { head: [], border: ['grey'] },
+      colAligns: ['left', 'left', 'left', 'left', 'left', 'right'],
+    });
+
+    const addRow = (tipo: string, entry: { offer: FlightOffer } | undefined, fmt: (o: FlightOffer) => string) => {
+      if (!entry) return;
+      const o = entry.offer;
+      table.push([
+        chalk.bold(tipo),
+        o.date,
+        o.flightNumber,
+        `${o.origin.timestamp.slice(11, 16)} ${o.origin.iata}`,
+        o.durationMin > 0 ? formatDuration(o.durationMin) : '--',
+        fmt(o),
+      ]);
+    };
+
+    addRow('BRL', best.brl, o =>
+      chalk.bold.green(`R$ ${o.fares.brl!.amount.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`),
+    );
+    addRow('Pontos', best.pts, o =>
+      chalk.bold.green(`${o.fares.points!.amount.toLocaleString('pt-BR')} pts`),
+    );
+    addRow('Híbrido', best.hyb, o =>
+      chalk.bold.green(`${o.fares.hybrid!.points.toLocaleString('pt-BR')} pts + R$ ${o.fares.hybrid!.cash.toLocaleString('pt-BR')}`),
+    );
+
+    console.log(table.toString());
+  }
+
+  console.log();
 }

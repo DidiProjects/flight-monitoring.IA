@@ -6,12 +6,12 @@ import { computeWithinTarget } from '../types/index.ts';
 const RESULTS_DIR = process.env['RESULTS_DIR'] ?? './results';
 const STATE_FILE  = path.join(RESULTS_DIR, 'state.json');
 
-interface BestEntry {
+export interface BestEntry {
   amount: number;
   offer: FlightOffer;
 }
 
-interface DirectionBest {
+export interface DirectionBest {
   brl?: BestEntry;
   pts?: BestEntry;
   hyb?: BestEntry;
