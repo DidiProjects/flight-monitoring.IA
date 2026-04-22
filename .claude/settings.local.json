@@ -28,7 +28,9 @@
       "Bash(python3 -c \" import json, sys d = json.load\\(sys.stdin\\) for item in d: if isinstance\\(item, dict\\): prop = item.get\\('property',''\\) if any\\(x in prop.lower\\(\\) for x in ['canvas','noise','resist','finger','privacy']\\): print\\(prop\\) \")",
       "Bash(python3 -c ' *)",
       "Read(//c/Users/Diego/.local/share/**)",
-      "Bash(find /root -name \"camoufox*\" -maxdepth 6)"
+      "Bash(find /root -name \"camoufox*\" -maxdepth 6)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
