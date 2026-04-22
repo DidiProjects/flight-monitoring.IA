@@ -23,7 +23,7 @@ jobs:
 
       - name: Sync and install
         run: |
-          ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} powershell -NoProfile -NonInteractive << 'EOF'
           $projectDir = Join-Path $HOME "flight-tracker"
           if (-not (Test-Path $projectDir)) {
             git clone https://github.com/${{ github.repository }}.git $projectDir
@@ -35,7 +35,7 @@ jobs:
 
       - name: Run flight search
         run: |
-          ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} powershell -NoProfile -NonInteractive << 'EOF'
           Set-Location (Join-Path $HOME "flight-tracker")
           $env:RESULTS_DIR            = './results'
           $env:FLIGHT_ORIGIN          = '${{ vars.FLIGHT_ORIGIN }}'
@@ -65,7 +65,7 @@ jobs:
       - name: AI fallback, auto-fix scraper
         if: failure()
         run: |
-          ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} powershell -NoProfile -NonInteractive << 'EOF'
           Set-Location (Join-Path $HOME "flight-tracker")
           $env:RESULTS_DIR            = './results'
           $env:FLIGHT_ORIGIN          = '${{ vars.FLIGHT_ORIGIN }}'
