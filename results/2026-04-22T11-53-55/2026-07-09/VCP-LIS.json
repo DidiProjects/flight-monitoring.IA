@@ -1,0 +1,205 @@
+[
+  {
+    "date": "2026-07-09",
+    "flightNumber": "AD8750",
+    "origin": {
+      "iata": "VCP09/07",
+      "timestamp": "2026-07-09T18:10:00+00:00"
+    },
+    "destination": {
+      "iata": "LIS10/07",
+      "timestamp": "2026-07-09T08:00:00+00:00"
+    },
+    "durationMin": 0,
+    "stops": 0,
+    "fares": {
+      "brl": {
+        "amount": 3277.16,
+        "currency": "BRL"
+      },
+      "points": {
+        "amount": 196000,
+        "currency": "PTS"
+      },
+      "hybrid": {
+        "points": 15700,
+        "cash": 2914.42,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-07-09",
+    "flightNumber": "AD8800",
+    "origin": {
+      "iata": "VCP09/07",
+      "timestamp": "2026-07-09T21:10:00+00:00"
+    },
+    "destination": {
+      "iata": "OPO10/07",
+      "timestamp": "2026-07-09T11:15:00+00:00"
+    },
+    "durationMin": 0,
+    "stops": 0,
+    "fares": {
+      "brl": {
+        "amount": 3217.35,
+        "currency": "BRL"
+      },
+      "points": {
+        "amount": 220000,
+        "currency": "PTS"
+      },
+      "hybrid": {
+        "points": 22000,
+        "cash": 2860.42,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-07-09",
+    "flightNumber": "AD8900",
+    "origin": {
+      "iata": "VCP09/07",
+      "timestamp": "2026-07-09T21:40:00+00:00"
+    },
+    "destination": {
+      "iata": "LIS10/07",
+      "timestamp": "2026-07-09T11:20:00+00:00"
+    },
+    "durationMin": 0,
+    "stops": 0,
+    "fares": {
+      "brl": {
+        "amount": 2728.88,
+        "currency": "BRL"
+      },
+      "points": {
+        "amount": 160000,
+        "currency": "PTS"
+      },
+      "hybrid": {
+        "points": 12800,
+        "cash": 2416.42,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-07-09",
+    "flightNumber": "AD8900",
+    "origin": {
+      "iata": "VCP09/07",
+      "timestamp": "2026-07-09T21:40:00+00:00"
+    },
+    "destination": {
+      "iata": "OPO10/07",
+      "timestamp": "2026-07-09T15:00:00+00:00"
+    },
+    "durationMin": 0,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 7044.07,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-07-09",
+    "flightNumber": "AD8900",
+    "origin": {
+      "iata": "VCP09/07",
+      "timestamp": "2026-07-09T21:40:00+00:00"
+    },
+    "destination": {
+      "iata": "OPO10/07",
+      "timestamp": "2026-07-09T17:00:00+00:00"
+    },
+    "durationMin": 0,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 7667.12,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-07-09",
+    "flightNumber": "AD8900",
+    "origin": {
+      "iata": "VCP09/07",
+      "timestamp": "2026-07-09T21:40:00+00:00"
+    },
+    "destination": {
+      "iata": "OPO10/07",
+      "timestamp": "2026-07-09T18:55:00+00:00"
+    },
+    "durationMin": 0,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 7044.07,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-07-09",
+    "flightNumber": "AD8900",
+    "origin": {
+      "iata": "VCP09/07",
+      "timestamp": "2026-07-09T21:40:00+00:00"
+    },
+    "destination": {
+      "iata": "OPO10/07",
+      "timestamp": "2026-07-09T20:25:00+00:00"
+    },
+    "durationMin": 0,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 7044.07,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  },
+  {
+    "date": "2026-07-09",
+    "flightNumber": "AD8750",
+    "origin": {
+      "iata": "VCP09/07",
+      "timestamp": "2026-07-09T18:10:00+00:00"
+    },
+    "destination": {
+      "iata": "OPO10/07",
+      "timestamp": "2026-07-09T10:55:00+00:00"
+    },
+    "durationMin": 0,
+    "stops": 1,
+    "fares": {
+      "brl": {
+        "amount": 7667.12,
+        "currency": "BRL"
+      }
+    },
+    "isReturn": true,
+    "withinTarget": false
+  }
+]

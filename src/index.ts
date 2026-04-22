@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import ora from 'ora';
 import { searchFlights } from './scrapers/azul.ts';
 import { displayResults, printBestResults } from './display/terminal.ts';
-import { setLogLevel } from './utils/logger.ts';
+import { setLogLevel, logger } from './utils/logger.ts';
 import { createRun, saveResults, pruneOldRuns } from './utils/runs.ts';
 import { computeWithinTarget } from './types/index.ts';
 import type { SearchParams, Targets, FlightOffer } from './types/index.ts';
@@ -153,7 +153,12 @@ try {
 
   // ── Email logic ─────────────────────────────────────────────────────────────
   const emailEnabled = env['EMAIL_ENABLED'] === 'true';
-  if (emailEnabled && results.length > 0) {
+
+  if (!emailEnabled) {
+    logger.info('Email: desabilitado');
+  } else if (results.length === 0) {
+    logger.info('Email: não enviado — nenhum voo encontrado');
+  } else {
     const runCount = incrementRun(state, today);
 
     const hasReturn = params.returnStart != null;
@@ -166,7 +171,6 @@ try {
     const canAlert = outboundWithin.length > 0 || (hasReturn && returnWithin.length > 0);
 
     if (canAlert) {
-      // Determine which target type matched from whichever direction has hits (priority: BRL → PTS → HYB)
       const m = 1 + params.margin;
       const allWithin = [...outboundWithin, ...returnWithin];
       const matchedType: 'brl' | 'pts' | 'hyb' =
@@ -205,25 +209,75 @@ try {
         await sendEmail(subject, html);
         markEmailed(state, today, outboundAmount, returnAmount, matchedType);
         run.log(`Alert email sent — ${matchedType.toUpperCase()}${bestOutbound ? ` outbound: ${bestOutbound.date} ${bestOutbound.flightNumber}` : ''}${bestReturn ? ` / return: ${bestReturn.date} ${bestReturn.flightNumber}` : ''}`);
+        logger.info({
+          type: matchedType,
+          outbound: bestOutbound ? `${bestOutbound.flightNumber} ${bestOutbound.date} (${outboundAmount})` : undefined,
+          return:   bestReturn   ? `${bestReturn.flightNumber} ${bestReturn.date} (${returnAmount})`       : undefined,
+        }, 'Email: alerta enviado');
+      } else {
+        const prev = state.days[today]?.lastEmailed;
+        logger.info({
+          type: matchedType,
+          outbound: { atual: outboundAmount, emailed: prev?.outbound },
+          return:   { atual: returnAmount,   emailed: prev?.return },
+        }, 'Email: sem melhora, não enviado');
       }
 
-    } else if (runCount >= 20 && !bestOfDayAlreadySent(state, today)) {
-      const best = pickBestOffer(state, today);
-      if (best && (best.outbound || best.ret)) {
-        const { subject, html } = buildBestOfDayEmail(
-          best.outbound?.offer,
-          best.ret?.offer,
-          best.type,
-          params.origin,
-          params.destination,
-          params.passengers,
-        );
-        await sendEmail(subject, html);
-        markBestOfDaySent(state, today);
-        run.log('Best-of-day email sent (20th run, no target hit today)');
+    } else {
+      // No flights within target — log best prices found vs thresholds
+      const bestOf = (offers: FlightOffer[], fn: (o: FlightOffer) => number | undefined) => {
+        let min: number | undefined;
+        for (const o of offers) { const v = fn(o); if (v != null && (min == null || v < min)) min = v; }
+        return min;
+      };
+      const m = 1 + params.margin;
+      const comparison: Record<string, unknown> = {};
+      if (targets.brl != null) {
+        comparison['brl'] = {
+          outbound:  bestOf(outboundResults, o => o.fares.brl?.amount),
+          return:    hasReturn ? bestOf(returnResults, o => o.fares.brl?.amount) : undefined,
+          threshold: Math.round(targets.brl * m * 100) / 100,
+        };
+      }
+      if (targets.pts != null) {
+        comparison['pts'] = {
+          outbound:  bestOf(outboundResults, o => o.fares.points?.amount),
+          return:    hasReturn ? bestOf(returnResults, o => o.fares.points?.amount) : undefined,
+          threshold: Math.round(targets.pts * m),
+        };
+      }
+      if (targets.hybPts != null || targets.hybBrl != null) {
+        comparison['hyb'] = {
+          outbound:     bestOf(outboundResults, o => o.fares.hybrid?.points),
+          return:       hasReturn ? bestOf(returnResults, o => o.fares.hybrid?.points) : undefined,
+          thresholdPts: targets.hybPts != null ? Math.round(targets.hybPts * m) : undefined,
+          thresholdBrl: targets.hybBrl != null ? Math.round(targets.hybBrl * m * 100) / 100 : undefined,
+        };
+      }
+      logger.info(comparison, 'Email: nenhum voo atingiu o target');
+
+      if (runCount >= 20 && !bestOfDayAlreadySent(state, today)) {
+        const best = pickBestOffer(state, today);
+        if (best && (best.outbound || best.ret)) {
+          const { subject, html } = buildBestOfDayEmail(
+            best.outbound?.offer,
+            best.ret?.offer,
+            best.type,
+            params.origin,
+            params.destination,
+            params.passengers,
+          );
+          await sendEmail(subject, html);
+          markBestOfDaySent(state, today);
+          run.log('Best-of-day email sent (20th run, no target hit today)');
+          logger.info({ runCount }, 'Email: best-of-day enviado');
+        }
+      } else if (runCount >= 20) {
+        logger.info({ runCount }, 'Email: best-of-day já enviado hoje');
+      } else {
+        logger.info({ runCount, aguardando: 20 }, 'Email: sem target, aguardando run 20 para best-of-day');
       }
     }
-
   }
 
   await saveState(state);
