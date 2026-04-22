@@ -23,8 +23,17 @@ jobs:
 
       - name: Ensure Windows VM is running
         run: |
-          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} \
-            "virsh --connect qemu:///system start windows10 2>/dev/null || true; sleep 15"
+          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} "
+            virsh --connect qemu:///system start windows10 2>/dev/null || true
+            for i in \$(seq 1 24); do
+              sleep 5
+              if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 diego@192.168.122.224 'exit' 2>/dev/null; then
+                exit 0
+              fi
+            done
+            echo 'Windows VM did not respond after 2 minutes'
+            exit 1
+          "
 
       - name: Sync and install
         run: |
