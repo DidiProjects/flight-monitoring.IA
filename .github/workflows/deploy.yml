@@ -87,7 +87,7 @@ jobs:
           $env:EMAIL_CC               = '${{ vars.EMAIL_CC }}'
           $env:EMAIL_SMTP_HOST        = '${{ vars.EMAIL_SMTP_HOST }}'
           $env:EMAIL_SMTP_PORT        = '${{ vars.EMAIL_SMTP_PORT }}'
-          $env:EMAIL_SMTP_USER        = '${{ vars.EMAIL_SMTP_USER }}'
+          $env:EMAIL_SMTP_USER        = '${{ secrets.EMAIL_SMTP_USER }}'
           $env:EMAIL_SMTP_PASSWORD    = '${{ secrets.EMAIL_SMTP_PASSWORD }}'
           $env:ANTHROPIC_API_KEY      = '${{ secrets.ANTHROPIC_API_KEY }}'
           npm run ai-fix
