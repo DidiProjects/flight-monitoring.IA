@@ -1,0 +1,87 @@
+{
+  "days": {
+    "2026-04-22": {
+      "runCount": 8,
+      "best": {
+        "outbound": {
+          "pts": {
+            "amount": 146520,
+            "offer": {
+              "date": "2026-06-05",
+              "flightNumber": "AD8753",
+              "origin": {
+                "iata": "LIS",
+                "timestamp": "2026-06-05T10:00:00+01:00"
+              },
+              "destination": {
+                "iata": "VCP",
+                "timestamp": "2026-06-05T16:15:00-03:00"
+              },
+              "durationMin": 615,
+              "stops": 0,
+              "fares": {
+                "brl": {
+                  "amount": 2723.45,
+                  "currency": "BRL"
+                },
+                "points": {
+                  "amount": 146520,
+                  "currency": "PTS"
+                },
+                "hybrid": {
+                  "points": 11732,
+                  "cash": 2426.82,
+                  "currency": "BRL"
+                }
+              },
+              "isReturn": false,
+              "withinTarget": true
+            }
+          }
+        },
+        "return": {
+          "pts": {
+            "amount": 148000,
+            "offer": {
+              "date": "2026-07-09",
+              "flightNumber": "AD8900",
+              "origin": {
+                "iata": "VCP â€¢ 09/07",
+                "timestamp": "2026-07-09T21:40:00+00:00"
+              },
+              "destination": {
+                "iata": "LIS â€¢ 10/07",
+                "timestamp": "2026-07-09T11:20:00+00:00"
+              },
+              "durationMin": 580,
+              "stops": 0,
+              "fares": {
+                "brl": {
+                  "amount": 2529.5,
+                  "currency": "BRL"
+                },
+                "points": {
+                  "amount": 148000,
+                  "currency": "PTS"
+                },
+                "hybrid": {
+                  "points": 11850,
+                  "cash": 2234.42,
+                  "currency": "BRL"
+                }
+              },
+              "isReturn": true,
+              "withinTarget": true
+            }
+          }
+        }
+      },
+      "emailSentAt": "2026-04-22T08:24:35.752Z",
+      "lastEmailed": {
+        "outbound": 146520,
+        "return": 148000,
+        "type": "pts"
+      }
+    }
+  }
+}
