@@ -21,9 +21,14 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+      - name: Ensure Windows VM is running
+        run: |
+          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} \
+            "virsh --connect qemu:///system start windows10 2>/dev/null || true; sleep 15"
+
       - name: Sync and install
         run: |
-          ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} powershell -NoProfile -NonInteractive << 'EOF'
+          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
           $projectDir = Join-Path $HOME "projects\flight.API"
           if (-not (Test-Path $projectDir)) {
             git clone https://github.com/${{ github.repository }}.git $projectDir
@@ -35,7 +40,7 @@ jobs:
 
       - name: Run flight search
         run: |
-          ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} powershell -NoProfile -NonInteractive << 'EOF'
+          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
           Set-Location (Join-Path $HOME "projects\flight.API")
           $env:RESULTS_DIR            = './results'
           $env:FLIGHT_ORIGIN          = '${{ vars.FLIGHT_ORIGIN }}'
@@ -62,10 +67,16 @@ jobs:
           npm start
           EOF
 
+      - name: Shutdown Windows VM
+        if: always()
+        run: |
+          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} \
+            "virsh --connect qemu:///system shutdown windows10 2>/dev/null || true"
+
       - name: AI fallback, auto-fix scraper
         if: failure()
         run: |
-          ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} powershell -NoProfile -NonInteractive << 'EOF'
+          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
           Set-Location (Join-Path $HOME "projects\flight.API")
           $env:RESULTS_DIR            = './results'
           $env:FLIGHT_ORIGIN          = '${{ vars.FLIGHT_ORIGIN }}'
