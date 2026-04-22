@@ -34,5 +34,5 @@ export async function sendEmail(
     html,
   });
 
-  logger.info({ to, subject }, 'Email sent');
+  logger.info({ to, cc, subject }, 'Email sent');
 }
