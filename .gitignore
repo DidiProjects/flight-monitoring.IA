@@ -2,3 +2,5 @@
 .env
 debug-*.png
 .env.example
+/results/**
+!/results/**/state.json
