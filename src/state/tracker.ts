@@ -11,13 +11,18 @@ interface BestEntry {
   offer: FlightOffer;
 }
 
+interface DirectionBest {
+  brl?: BestEntry;
+  pts?: BestEntry;
+  hyb?: BestEntry;
+}
+
 interface DailyState {
   emailSentAt?: string;
   runCount: number;
   best: {
-    brl?: BestEntry;
-    pts?: BestEntry;
-    hyb?: BestEntry;
+    outbound: DirectionBest;
+    return: DirectionBest;
   };
 }
 
@@ -45,9 +50,13 @@ export async function saveState(state: AppState): Promise<void> {
 
 function getDay(state: AppState, date: string): DailyState {
   if (!state.days[date]) {
-    state.days[date] = { runCount: 0, best: {} };
+    state.days[date] = { runCount: 0, best: { outbound: {}, return: {} } };
   }
-  return state.days[date]!;
+  // Migrate old structure that didn't have outbound/return split
+  const day = state.days[date]!;
+  if (!day.best.outbound) (day.best as any).outbound = {};
+  if (!day.best.return)   (day.best as any).return   = {};
+  return day;
 }
 
 export function incrementRun(state: AppState, date: string): number {
@@ -60,23 +69,19 @@ export function updateBestOffers(state: AppState, date: string, offers: FlightOf
   const day = getDay(state, date);
 
   for (const offer of offers) {
+    const dir = offer.isReturn ? day.best.return : day.best.outbound;
+
     if (targets.brl != null && offer.fares.brl) {
       const v = offer.fares.brl.amount;
-      if (!day.best.brl || v < day.best.brl.amount) {
-        day.best.brl = { amount: v, offer };
-      }
+      if (!dir.brl || v < dir.brl.amount) dir.brl = { amount: v, offer };
     }
     if (targets.pts != null && offer.fares.points) {
       const v = offer.fares.points.amount;
-      if (!day.best.pts || v < day.best.pts.amount) {
-        day.best.pts = { amount: v, offer };
-      }
+      if (!dir.pts || v < dir.pts.amount) dir.pts = { amount: v, offer };
     }
     if ((targets.hybPts != null || targets.hybBrl != null) && offer.fares.hybrid) {
       const v = offer.fares.hybrid.points;
-      if (!day.best.hyb || v < day.best.hyb.amount) {
-        day.best.hyb = { amount: v, offer };
-      }
+      if (!dir.hyb || v < dir.hyb.amount) dir.hyb = { amount: v, offer };
     }
   }
 }
@@ -98,13 +103,16 @@ export function getOffersWithinTarget(
   return offers.filter(o => computeWithinTarget(o, targets, margin));
 }
 
-// Returns the single best offer to send in the 20th-run fallback email.
-// Priority: BRL → PTS → HYB
-export function pickBestOffer(state: AppState, date: string): { entry: BestEntry; type: 'brl' | 'pts' | 'hyb' } | null {
+export function pickBestOffer(
+  state: AppState,
+  date: string,
+): { outbound: BestEntry | null; ret: BestEntry | null; type: 'brl' | 'pts' | 'hyb' } | null {
   const day = state.days[date];
   if (!day) return null;
-  if (day.best.brl) return { entry: day.best.brl, type: 'brl' };
-  if (day.best.pts) return { entry: day.best.pts, type: 'pts' };
-  if (day.best.hyb) return { entry: day.best.hyb, type: 'hyb' };
+  const ob = day.best.outbound;
+  const rt = day.best.return;
+  if (ob.brl || rt.brl) return { outbound: ob.brl ?? null, ret: rt.brl ?? null, type: 'brl' };
+  if (ob.pts || rt.pts) return { outbound: ob.pts ?? null, ret: rt.pts ?? null, type: 'pts' };
+  if (ob.hyb || rt.hyb) return { outbound: ob.hyb ?? null, ret: rt.hyb ?? null, type: 'hyb' };
   return null;
 }

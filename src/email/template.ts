@@ -113,37 +113,42 @@ export interface EmailContent {
 }
 
 export function buildAlertEmail(
-  offer: FlightOffer,
+  outbound: FlightOffer | undefined,
+  returnOffer: FlightOffer | undefined,
   origin: string,
   destination: string,
   targetType: 'brl' | 'pts' | 'hyb',
   passengers: number,
 ): EmailContent {
   const routeLabel = `${origin} → ${destination}`;
-  const label = offer.isReturn
-    ? `Volta  ${offer.origin.iata} → ${offer.destination.iata}`
-    : `Ida  ${offer.origin.iata} → ${offer.destination.iata}`;
 
-  const body = offerBlock(offer, targetType, passengers, label);
+  let body = '';
+  if (outbound) body += offerBlock(outbound, targetType, passengers, `Ida  ${outbound.origin.iata} → ${outbound.destination.iata}`);
+  if (returnOffer) body += offerBlock(returnOffer, targetType, passengers, `Volta  ${returnOffer.origin.iata} → ${returnOffer.destination.iata}`);
+
+  const subtitle =
+    outbound && returnOffer ? `Encontramos passagens de ida e volta dentro do seu limite para a rota <strong>${routeLabel}</strong>.` :
+    outbound               ? `Encontramos uma passagem de ida dentro do seu limite para a rota <strong>${routeLabel}</strong>.` :
+                             `Encontramos uma passagem de volta dentro do seu limite para a rota <strong>${routeLabel}</strong>.`;
+
   const subject = `Azul — Tarifa disponível: ${routeLabel}`;
-  const subtitle = `Encontramos a melhor passagem dentro do seu limite para a rota <strong>${routeLabel}</strong>.`;
-
   return { subject, html: layout(subject, subtitle, body) };
 }
 
 export function buildBestOfDayEmail(
-  offer: FlightOffer,
+  outbound: FlightOffer | undefined,
+  returnOffer: FlightOffer | undefined,
   targetType: 'brl' | 'pts' | 'hyb',
   origin: string,
   destination: string,
   passengers: number,
 ): EmailContent {
   const routeLabel = `${origin} → ${destination}`;
-  const label = offer.isReturn
-    ? `Volta  ${offer.origin.iata} → ${offer.destination.iata}`
-    : `Ida  ${offer.origin.iata} → ${offer.destination.iata}`;
 
-  const body = offerBlock(offer, targetType, passengers, label);
+  let body = '';
+  if (outbound) body += offerBlock(outbound, targetType, passengers, `Ida  ${outbound.origin.iata} → ${outbound.destination.iata}`);
+  if (returnOffer) body += offerBlock(returnOffer, targetType, passengers, `Volta  ${returnOffer.origin.iata} → ${returnOffer.destination.iata}`);
+
   const subject = `Azul — Melhor tarifa do dia: ${routeLabel}`;
   const subtitle = `Nenhuma tarifa dentro do limite foi encontrada hoje. Este é o menor preço registrado nas buscas de ${new Date().toLocaleDateString('pt-BR')}.`;
 

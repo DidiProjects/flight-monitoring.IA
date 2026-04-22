@@ -1,0 +1,40 @@
+Run ssh -o StrictHostKeyChecking=no diego@100.79.133.110 powershell -NoProfile -NonInteractive << 'EOF'
+Windows PowerShell
+Copyright (C) Microsoft Corporation. Todos os direitos reservados.
+
+Experimente a nova plataforma cruzada PowerShell https://aka.ms/pscore6
+
+PS C:\Users\Diego> Set-Location (Join-Path $HOME "projects\flight.API")
+PS C:\Users\Diego\projects\flight.API> $env:RESULTS_DIR            = './results'
+PS C:\Users\Diego\projects\flight.API> $env:FLIGHT_ORIGIN          = 'LIS'
+PS C:\Users\Diego\projects\flight.API> $env:FLIGHT_DESTINATION     = 'CNF'
+PS C:\Users\Diego\projects\flight.API> $env:FLIGHT_TARGET_BRL      = '0'
+PS C:\Users\Diego\projects\flight.API> $env:FLIGHT_TARGET_PTS      = '150000'
+PS C:\Users\Diego\projects\flight.API> $env:FLIGHT_TARGET_HYB_PTS  = '0'
+PS C:\Users\Diego\projects\flight.API> $env:FLIGHT_TARGET_HYB_BRL  = '0'
+PS C:\Users\Diego\projects\flight.API> $env:FLIGHT_MARGIN          = '0.1'
+PS C:\Users\Diego\projects\flight.API> $env:FLIGHT_OUTBOUND_START  = '2026-05-29'
+PS C:\Users\Diego\projects\flight.API> $env:FLIGHT_OUTBOUND_END    = '2026-06-08'
+PS C:\Users\Diego\projects\flight.API> $env:FLIGHT_RETURN_START    = '2026-07-05'
+PS C:\Users\Diego\projects\flight.API> $env:FLIGHT_RETURN_END      = '2026-07-12'
+PS C:\Users\Diego\projects\flight.API> $env:FLIGHT_PASSENGERS      = '1'
+PS C:\Users\Diego\projects\flight.API> $env:FLIGHT_VERBOSE         = 'false'
+PS C:\Users\Diego\projects\flight.API> $env:LOG_LEVEL              = 'info'
+PS C:\Users\Diego\projects\flight.API> $env:EMAIL_ENABLED          = 'true'
+PS C:\Users\Diego\projects\flight.API> $env:EMAIL_RECIPIENT        = 'diegossufmg@gmail.com'
+PS C:\Users\Diego\projects\flight.API> $env:EMAIL_CC               = 'diego.silva.lv93@gmail.com'
+PS C:\Users\Diego\projects\flight.API> $env:EMAIL_SMTP_HOST        = 'smtp.gmail.com'
+PS C:\Users\Diego\projects\flight.API> $env:EMAIL_SMTP_PORT        = '587'
+PS C:\Users\Diego\projects\flight.API> $env:EMAIL_SMTP_USER        = '***'
+PS C:\Users\Diego\projects\flight.API> $env:EMAIL_SMTP_PASSWORD    = '***'
+PS C:\Users\Diego\projects\flight.API> npm start
+npm : O arquivo C:\Program Files\nodejs\npm.ps1 n�o pode ser carregado porque a execu��o de scripts foi desabilitada 
+neste sistema. Para obter mais informa��es, consulte about_Execution_Policies em 
+https://go.microsoft.com/fwlink/?LinkID=135170.
+No linha:1 caractere:1
++ npm start
++ ~~~
+    + CategoryInfo          : ErrodeSeguran�a: (:) [], PSSecurityException
+    + FullyQualifiedErrorId : UnauthorizedAccess
+PS C:\Users\Diego\projects\flight.API> 
+Error: Process completed with exit code 1.

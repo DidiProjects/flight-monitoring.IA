@@ -6,7 +6,7 @@ import { displayResults } from './display/terminal.ts';
 import { setLogLevel } from './utils/logger.ts';
 import { createRun, saveResults, pruneOldRuns } from './utils/runs.ts';
 import { computeWithinTarget } from './types/index.ts';
-import type { SearchParams, Targets } from './types/index.ts';
+import type { SearchParams, Targets, FlightOffer } from './types/index.ts';
 import {
   loadState, saveState, todayStr,
   incrementRun, updateBestOffers,
@@ -128,18 +128,25 @@ try {
     updateBestOffers(state, today, results, targets);
 
     if (!emailAlreadySentToday(state, today)) {
-      const withinTarget = getOffersWithinTarget(results, targets, params.margin);
+      const hasReturn = params.returnStart != null;
+      const outboundResults = results.filter(o => !o.isReturn);
+      const returnResults   = results.filter(o => o.isReturn);
 
-      if (withinTarget.length > 0) {
-        // Determine which target type matched (priority: BRL → PTS → HYB)
+      const outboundWithin = getOffersWithinTarget(outboundResults, targets, params.margin);
+      const returnWithin   = hasReturn ? getOffersWithinTarget(returnResults, targets, params.margin) : [];
+
+      const canAlert = outboundWithin.length > 0 || (hasReturn && returnWithin.length > 0);
+
+      if (canAlert) {
+        // Determine which target type matched from whichever direction has hits (priority: BRL → PTS → HYB)
         const m = 1 + params.margin;
+        const allWithin = [...outboundWithin, ...returnWithin];
         const matchedType: 'brl' | 'pts' | 'hyb' =
-          withinTarget.some(o => targets.brl != null && o.fares.brl && o.fares.brl.amount <= targets.brl * m) ? 'brl' :
-          withinTarget.some(o => targets.pts != null && o.fares.points && o.fares.points.amount <= targets.pts * m) ? 'pts' :
+          allWithin.some(o => targets.brl != null && o.fares.brl && o.fares.brl.amount <= targets.brl * m) ? 'brl' :
+          allWithin.some(o => targets.pts != null && o.fares.points && o.fares.points.amount <= targets.pts * m) ? 'pts' :
           'hyb';
 
-        // Pick the single best offer for the matched target type
-        const bestOffer = withinTarget.reduce((best, o) => {
+        const pickBest = (offers: FlightOffer[]) => offers.reduce((best, o) => {
           const val = (x: typeof o) =>
             matchedType === 'brl' ? (x.fares.brl?.amount ?? Infinity) :
             matchedType === 'pts' ? (x.fares.points?.amount ?? Infinity) :
@@ -147,8 +154,12 @@ try {
           return val(o) < val(best) ? o : best;
         });
 
+        const bestOutbound = outboundWithin.length > 0 ? pickBest(outboundWithin) : undefined;
+        const bestReturn   = returnWithin.length > 0   ? pickBest(returnWithin)   : undefined;
+
         const { subject, html } = buildAlertEmail(
-          bestOffer,
+          bestOutbound,
+          bestReturn,
           params.origin,
           params.destination,
           matchedType,
@@ -156,13 +167,14 @@ try {
         );
         await sendEmail(subject, html);
         markEmailSent(state, today);
-        run.log(`Alert email sent — best offer: ${matchedType.toUpperCase()} ${bestOffer.date} ${bestOffer.flightNumber}`);
+        run.log(`Alert email sent — ${matchedType.toUpperCase()}${bestOutbound ? ` outbound: ${bestOutbound.date} ${bestOutbound.flightNumber}` : ''}${bestReturn ? ` / return: ${bestReturn.date} ${bestReturn.flightNumber}` : ''}`);
 
       } else if (runCount >= 20) {
         const best = pickBestOffer(state, today);
-        if (best) {
+        if (best && (best.outbound || best.ret)) {
           const { subject, html } = buildBestOfDayEmail(
-            best.entry.offer,
+            best.outbound?.offer,
+            best.ret?.offer,
             best.type,
             params.origin,
             params.destination,
