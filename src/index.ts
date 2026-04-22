@@ -93,6 +93,28 @@ const params: SearchParams = {
   verbose:       opts.verbose,
 };
 
+// ── Date validation ───────────────────────────────────────────────────────────
+
+const today = new Date().toISOString().slice(0, 10);
+
+if (params.outboundEnd && params.outboundEnd < today) {
+  console.log(`Outbound search window ended on ${params.outboundEnd}. Exiting.`);
+  process.exit(0);
+}
+
+if (params.returnEnd && params.returnEnd < today) {
+  console.log(`Return search window ended on ${params.returnEnd}. Exiting.`);
+  process.exit(0);
+}
+
+if (params.outboundStart < today) {
+  params.outboundStart = today;
+}
+
+if (params.returnStart && params.returnStart < today) {
+  params.returnStart = today;
+}
+
 // ── Run ───────────────────────────────────────────────────────────────────────
 
 const run = await createRun(params);
