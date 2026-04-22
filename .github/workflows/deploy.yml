@@ -11,9 +11,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
@@ -24,53 +21,44 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Sync project to server
-        run: |
-          ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} \
-            "mkdir -p /home/diego/flight-tracker"
-
-          rsync -az \
-            -e "ssh -o StrictHostKeyChecking=no" \
-            --exclude='.git' \
-            --exclude='node_modules' \
-            --exclude='.env' \
-            --exclude='results/' \
-            --exclude='debug-*.png' \
-            ./ diego@${{ vars.TAILSCALE_IP }}:/home/diego/flight-tracker/
-
-      - name: Install dependencies
+      - name: Sync and install
         run: |
           ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} << 'EOF'
-          cd /home/diego/flight-tracker
+          $projectDir = Join-Path $HOME "flight-tracker"
+          if (-not (Test-Path $projectDir)) {
+            git clone https://github.com/${{ github.repository }}.git $projectDir
+          }
+          Set-Location $projectDir
+          git pull
           npm ci
           EOF
 
       - name: Run flight search
         run: |
           ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} << 'EOF'
-          cd /home/diego/flight-tracker
-          RESULTS_DIR=./results \
-          FLIGHT_ORIGIN="${{ vars.FLIGHT_ORIGIN }}" \
-          FLIGHT_DESTINATION="${{ vars.FLIGHT_DESTINATION }}" \
-          FLIGHT_TARGET_BRL="${{ vars.FLIGHT_TARGET_BRL }}" \
-          FLIGHT_TARGET_PTS="${{ vars.FLIGHT_TARGET_PTS }}" \
-          FLIGHT_TARGET_HYB_PTS="${{ vars.FLIGHT_TARGET_HYB_PTS }}" \
-          FLIGHT_TARGET_HYB_BRL="${{ vars.FLIGHT_TARGET_HYB_BRL }}" \
-          FLIGHT_MARGIN="${{ vars.FLIGHT_MARGIN }}" \
-          FLIGHT_OUTBOUND_START="${{ vars.FLIGHT_OUTBOUND_START }}" \
-          FLIGHT_OUTBOUND_END="${{ vars.FLIGHT_OUTBOUND_END }}" \
-          FLIGHT_RETURN_START="${{ vars.FLIGHT_RETURN_START }}" \
-          FLIGHT_RETURN_END="${{ vars.FLIGHT_RETURN_END }}" \
-          FLIGHT_PASSENGERS="${{ vars.FLIGHT_PASSENGERS }}" \
-          FLIGHT_VERBOSE="${{ vars.FLIGHT_VERBOSE }}" \
-          LOG_LEVEL="${{ vars.LOG_LEVEL }}" \
-          EMAIL_ENABLED="${{ vars.EMAIL_ENABLED }}" \
-          EMAIL_RECIPIENT="${{ vars.EMAIL_RECIPIENT }}" \
-          EMAIL_CC="${{ vars.EMAIL_CC }}" \
-          EMAIL_SMTP_HOST="${{ vars.EMAIL_SMTP_HOST }}" \
-          EMAIL_SMTP_PORT="${{ vars.EMAIL_SMTP_PORT }}" \
-          EMAIL_SMTP_USER="${{ secrets.EMAIL_SMTP_USER }}" \
-          EMAIL_SMTP_PASSWORD="${{ secrets.EMAIL_SMTP_PASSWORD }}" \
+          Set-Location (Join-Path $HOME "flight-tracker")
+          $env:RESULTS_DIR            = './results'
+          $env:FLIGHT_ORIGIN          = '${{ vars.FLIGHT_ORIGIN }}'
+          $env:FLIGHT_DESTINATION     = '${{ vars.FLIGHT_DESTINATION }}'
+          $env:FLIGHT_TARGET_BRL      = '${{ vars.FLIGHT_TARGET_BRL }}'
+          $env:FLIGHT_TARGET_PTS      = '${{ vars.FLIGHT_TARGET_PTS }}'
+          $env:FLIGHT_TARGET_HYB_PTS  = '${{ vars.FLIGHT_TARGET_HYB_PTS }}'
+          $env:FLIGHT_TARGET_HYB_BRL  = '${{ vars.FLIGHT_TARGET_HYB_BRL }}'
+          $env:FLIGHT_MARGIN          = '${{ vars.FLIGHT_MARGIN }}'
+          $env:FLIGHT_OUTBOUND_START  = '${{ vars.FLIGHT_OUTBOUND_START }}'
+          $env:FLIGHT_OUTBOUND_END    = '${{ vars.FLIGHT_OUTBOUND_END }}'
+          $env:FLIGHT_RETURN_START    = '${{ vars.FLIGHT_RETURN_START }}'
+          $env:FLIGHT_RETURN_END      = '${{ vars.FLIGHT_RETURN_END }}'
+          $env:FLIGHT_PASSENGERS      = '${{ vars.FLIGHT_PASSENGERS }}'
+          $env:FLIGHT_VERBOSE         = '${{ vars.FLIGHT_VERBOSE }}'
+          $env:LOG_LEVEL              = '${{ vars.LOG_LEVEL }}'
+          $env:EMAIL_ENABLED          = '${{ vars.EMAIL_ENABLED }}'
+          $env:EMAIL_RECIPIENT        = '${{ vars.EMAIL_RECIPIENT }}'
+          $env:EMAIL_CC               = '${{ vars.EMAIL_CC }}'
+          $env:EMAIL_SMTP_HOST        = '${{ vars.EMAIL_SMTP_HOST }}'
+          $env:EMAIL_SMTP_PORT        = '${{ vars.EMAIL_SMTP_PORT }}'
+          $env:EMAIL_SMTP_USER        = '${{ secrets.EMAIL_SMTP_USER }}'
+          $env:EMAIL_SMTP_PASSWORD    = '${{ secrets.EMAIL_SMTP_PASSWORD }}'
           npm start
           EOF
 
@@ -78,29 +66,29 @@ jobs:
         if: failure()
         run: |
           ssh -o StrictHostKeyChecking=no diego@${{ vars.TAILSCALE_IP }} << 'EOF'
-          cd /home/diego/flight-tracker
-          RESULTS_DIR=./results \
-          FLIGHT_ORIGIN="${{ vars.FLIGHT_ORIGIN }}" \
-          FLIGHT_DESTINATION="${{ vars.FLIGHT_DESTINATION }}" \
-          FLIGHT_TARGET_BRL="${{ vars.FLIGHT_TARGET_BRL }}" \
-          FLIGHT_TARGET_PTS="${{ vars.FLIGHT_TARGET_PTS }}" \
-          FLIGHT_TARGET_HYB_PTS="${{ vars.FLIGHT_TARGET_HYB_PTS }}" \
-          FLIGHT_TARGET_HYB_BRL="${{ vars.FLIGHT_TARGET_HYB_BRL }}" \
-          FLIGHT_MARGIN="${{ vars.FLIGHT_MARGIN }}" \
-          FLIGHT_OUTBOUND_START="${{ vars.FLIGHT_OUTBOUND_START }}" \
-          FLIGHT_OUTBOUND_END="${{ vars.FLIGHT_OUTBOUND_END }}" \
-          FLIGHT_RETURN_START="${{ vars.FLIGHT_RETURN_START }}" \
-          FLIGHT_RETURN_END="${{ vars.FLIGHT_RETURN_END }}" \
-          FLIGHT_PASSENGERS="${{ vars.FLIGHT_PASSENGERS }}" \
-          FLIGHT_VERBOSE="${{ vars.FLIGHT_VERBOSE }}" \
-          LOG_LEVEL="${{ vars.LOG_LEVEL }}" \
-          EMAIL_ENABLED="${{ vars.EMAIL_ENABLED }}" \
-          EMAIL_RECIPIENT="${{ vars.EMAIL_RECIPIENT }}" \
-          EMAIL_CC="${{ vars.EMAIL_CC }}" \
-          EMAIL_SMTP_HOST="${{ vars.EMAIL_SMTP_HOST }}" \
-          EMAIL_SMTP_PORT="${{ vars.EMAIL_SMTP_PORT }}" \
-          EMAIL_SMTP_USER="${{ vars.EMAIL_SMTP_USER }}" \
-          EMAIL_SMTP_PASSWORD="${{ secrets.EMAIL_SMTP_PASSWORD }}" \
-          ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+          Set-Location (Join-Path $HOME "flight-tracker")
+          $env:RESULTS_DIR            = './results'
+          $env:FLIGHT_ORIGIN          = '${{ vars.FLIGHT_ORIGIN }}'
+          $env:FLIGHT_DESTINATION     = '${{ vars.FLIGHT_DESTINATION }}'
+          $env:FLIGHT_TARGET_BRL      = '${{ vars.FLIGHT_TARGET_BRL }}'
+          $env:FLIGHT_TARGET_PTS      = '${{ vars.FLIGHT_TARGET_PTS }}'
+          $env:FLIGHT_TARGET_HYB_PTS  = '${{ vars.FLIGHT_TARGET_HYB_PTS }}'
+          $env:FLIGHT_TARGET_HYB_BRL  = '${{ vars.FLIGHT_TARGET_HYB_BRL }}'
+          $env:FLIGHT_MARGIN          = '${{ vars.FLIGHT_MARGIN }}'
+          $env:FLIGHT_OUTBOUND_START  = '${{ vars.FLIGHT_OUTBOUND_START }}'
+          $env:FLIGHT_OUTBOUND_END    = '${{ vars.FLIGHT_OUTBOUND_END }}'
+          $env:FLIGHT_RETURN_START    = '${{ vars.FLIGHT_RETURN_START }}'
+          $env:FLIGHT_RETURN_END      = '${{ vars.FLIGHT_RETURN_END }}'
+          $env:FLIGHT_PASSENGERS      = '${{ vars.FLIGHT_PASSENGERS }}'
+          $env:FLIGHT_VERBOSE         = '${{ vars.FLIGHT_VERBOSE }}'
+          $env:LOG_LEVEL              = '${{ vars.LOG_LEVEL }}'
+          $env:EMAIL_ENABLED          = '${{ vars.EMAIL_ENABLED }}'
+          $env:EMAIL_RECIPIENT        = '${{ vars.EMAIL_RECIPIENT }}'
+          $env:EMAIL_CC               = '${{ vars.EMAIL_CC }}'
+          $env:EMAIL_SMTP_HOST        = '${{ vars.EMAIL_SMTP_HOST }}'
+          $env:EMAIL_SMTP_PORT        = '${{ vars.EMAIL_SMTP_PORT }}'
+          $env:EMAIL_SMTP_USER        = '${{ vars.EMAIL_SMTP_USER }}'
+          $env:EMAIL_SMTP_PASSWORD    = '${{ secrets.EMAIL_SMTP_PASSWORD }}'
+          $env:ANTHROPIC_API_KEY      = '${{ secrets.ANTHROPIC_API_KEY }}'
           npm run ai-fix
           EOF
