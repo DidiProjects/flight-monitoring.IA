@@ -66,6 +66,15 @@ jobs:
           Add-Content  -Path $p -Value "LOG_PRETTY=false"
           EOF
 
+      - name: Reconfigure NSSM
+        run: |
+          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
+          $dir = Join-Path $HOME "artifacts\scraping.API"
+          nssm set scraping-api Application "C:\Program Files\nodejs\node.exe"
+          nssm set scraping-api AppParameters "--import file:///C:/Users/diego/artifacts/scraping.API/node_modules/tsx/dist/esm/index.cjs C:/Users/diego/artifacts/scraping.API/src/main.ts"
+          nssm set scraping-api AppDirectory $dir
+          EOF
+
       - name: Restart service
         run: |
           ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
