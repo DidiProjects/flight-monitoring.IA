@@ -1,7 +1,7 @@
 {
-  "name": "flight-scraping-api",
+  "name": "scraping-api",
   "version": "1.0.0",
-  "description": "flightScraping.API — HTTP scraping API for Azul Airlines",
+  "description": "scraping.API — HTTP scraping API for Azul Airlines",
   "type": "module",
   "engines": {
     "node": ">=22.0.0"

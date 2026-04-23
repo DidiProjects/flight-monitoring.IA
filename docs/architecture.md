@@ -1,8 +1,8 @@
-# Arquitetura — flightScraping.API
+# Arquitetura — scraping.API
 
 ## Contexto
 
-Este projeto (`flightScraping.API`) roda na **Windows VM** e é responsável exclusivamente por raspagem de dados. Não contém regras de negócio.
+Este projeto (`scraping.API`) roda na **Windows VM** e é responsável exclusivamente por raspagem de dados. Não contém regras de negócio.
 
 O cliente desta API é o `flight.API`, rodando no **Linux host**, que orquestra as raspagens, processa os resultados e toma decisões de negócio (alertas, emails, etc.).
 
@@ -15,7 +15,7 @@ flight.API (Linux — 192.168.122.1)
   │
   │  POST /scrape  (X-API-Key)
   ▼
-flightScraping.API (Windows VM — 192.168.122.224)
+scraping.API (Windows VM — 192.168.122.224)
   │  recebe parâmetros
   │  executa raspagem (Playwright / Camoufox)
   │  POST /results  (X-API-Key)
@@ -31,10 +31,10 @@ flight.API (Linux — 192.168.122.1)
 
 | Projeto | Onde roda | Responsabilidade |
 |---|---|---|
-| `flightScraping.API` | Windows VM | Raspar dados, devolver resultados crus |
+| `scraping.API` | Windows VM | Raspar dados, devolver resultados crus |
 | `flight.API` | Linux host | Orquestrar raspagens, regras de negócio, notificações |
 
-`flightScraping.API` **nunca** decide o que fazer com os dados — apenas coleta e devolve.
+`scraping.API` **nunca** decide o que fazer com os dados — apenas coleta e devolve.
 
 ---
 
@@ -173,24 +173,24 @@ curl -o nssm.zip https://nssm.cc/release/nssm-2.24.zip
 Expand-Archive nssm.zip -DestinationPath C:\nssm
 copy C:\nssm\nssm-2.24\win64\nssm.exe C:\Windows\System32\
 
-nssm install flight-scraping-api node
-nssm set flight-scraping-api AppDirectory C:\Users\diego\projects\flightScraping.API
-nssm set flight-scraping-api AppParameters "dist\main.js"
-nssm set flight-scraping-api AppEnvironmentExtra "NODE_ENV=production"
-nssm set flight-scraping-api Start SERVICE_AUTO_START
-nssm set flight-scraping-api AppStdout C:\Users\diego\projects\flightScraping.API\logs\service.log
-nssm set flight-scraping-api AppStderr C:\Users\diego\projects\flightScraping.API\logs\service-error.log
+nssm install scraping-api node
+nssm set scraping-api AppDirectory C:\Users\diego\projects\scraping.API
+nssm set scraping-api AppParameters "dist\main.js"
+nssm set scraping-api AppEnvironmentExtra "NODE_ENV=production"
+nssm set scraping-api Start SERVICE_AUTO_START
+nssm set scraping-api AppStdout C:\Users\diego\projects\scraping.API\logs\service.log
+nssm set scraping-api AppStderr C:\Users\diego\projects\scraping.API\logs\service-error.log
 
-nssm start flight-scraping-api
+nssm start scraping-api
 ```
 
 ### Comandos úteis
 
 ```powershell
-nssm status flight-scraping-api
-nssm restart flight-scraping-api
-nssm stop flight-scraping-api
-nssm remove flight-scraping-api
+nssm status scraping-api
+nssm restart scraping-api
+nssm stop scraping-api
+nssm remove scraping-api
 ```
 
 ---
@@ -201,7 +201,7 @@ nssm remove flight-scraping-api
 2. `git pull`
 3. `npm ci`
 4. `npm run build`
-5. `nssm restart flight-scraping-api`
+5. `nssm restart scraping-api`
 6. `GET /health` para confirmar que subiu
 
 > A VM fica rodando permanentemente — sem shutdown após deploy.

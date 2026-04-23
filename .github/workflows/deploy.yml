@@ -1,4 +1,4 @@
-name: Deploy flightScraping.API
+name: Deploy scraping.API
 
 on:
   workflow_dispatch:
@@ -42,7 +42,7 @@ jobs:
       - name: Sync and install
         run: |
           ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          $projectDir = Join-Path $HOME "artifacts\flightScraping.API"
+          $projectDir = Join-Path $HOME "artifacts\scraping.API"
           if (-not (Test-Path $projectDir)) {
             New-Item -ItemType Directory -Path $projectDir -Force | Out-Null
             git clone https://github.com/${{ github.repository }}.git $projectDir
@@ -55,7 +55,7 @@ jobs:
       - name: Write .env
         run: |
           ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          Set-Content -Path (Join-Path $HOME "artifacts\flightScraping.API\.env") -Value @"
+          Set-Content -Path (Join-Path $HOME "artifacts\scraping.API\.env") -Value @"
           PORT=${{ vars.SCRAPING_PORT }}
           SCRAPER_API_KEY=${{ secrets.SCRAPER_API_KEY }}
           FLIGHT_API_URL=${{ vars.FLIGHT_API_URL }}
@@ -70,7 +70,7 @@ jobs:
       - name: Restart service
         run: |
           ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          $svc = "flight-scraping-api"
+          $svc = "scraping-api"
           $status = nssm status $svc 2>$null
           if ($status -eq "SERVICE_RUNNING" -or $status -eq "SERVICE_PAUSED") {
             nssm restart $svc
@@ -105,7 +105,7 @@ jobs:
         if: failure()
         run: |
           ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          Set-Location (Join-Path $HOME "artifacts\flightScraping.API")
+          Set-Location (Join-Path $HOME "artifacts\scraping.API")
           $env:ANTHROPIC_API_KEY = '${{ secrets.ANTHROPIC_API_KEY }}'
           npm run ai-fix
           EOF
