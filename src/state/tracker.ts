@@ -101,10 +101,17 @@ export function hasOfferImproved(
   returnAmount: number | undefined,
 ): boolean {
   const emailed = state.days[date]?.lastEmailed;
-  if (!emailed) return true;
 
-  if (outboundAmount != null && (emailed.outbound == null || outboundAmount < emailed.outbound)) return true;
-  if (returnAmount   != null && (emailed.return   == null || returnAmount   < emailed.return))   return true;
+  // No emails today yet — fall back to yesterday to avoid re-sending unchanged prices on day rollover
+  const prev = new Date(date);
+  prev.setDate(prev.getDate() - 1);
+  const yesterday = prev.toISOString().slice(0, 10);
+  const reference = emailed ?? state.days[yesterday]?.lastEmailed;
+
+  if (!reference) return true;
+
+  if (outboundAmount != null && (reference.outbound == null || outboundAmount < reference.outbound)) return true;
+  if (returnAmount   != null && (reference.return   == null || returnAmount   < reference.return))   return true;
   return false;
 }
 
