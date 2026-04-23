@@ -3,7 +3,7 @@ name: Deploy scraping.API
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [develop]
     paths:
       - 'src/**'
       - 'package.json'
@@ -45,7 +45,7 @@ jobs:
           $projectDir = Join-Path $HOME "artifacts\scraping.API"
           if (-not (Test-Path $projectDir)) {
             New-Item -ItemType Directory -Path $projectDir -Force | Out-Null
-            git clone https://github.com/${{ github.repository }}.git $projectDir
+            git clone -b develop https://github.com/${{ github.repository }}.git $projectDir
           }
           Set-Location $projectDir
           git pull
