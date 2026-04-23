@@ -79,17 +79,14 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
           $svc = "scraping-api"
-          $status = (nssm status $svc 2>$null).Trim()
-          if ($status -eq "SERVICE_RUNNING" -or $status -eq "SERVICE_PAUSED") {
-            nssm stop $svc
-            Start-Sleep -Seconds 3
-          }
-          nssm start $svc
-          for ($i = 1; $i -le 6; $i++) {
+          sc.exe stop $svc 2>$null
+          Start-Sleep -Seconds 3
+          sc.exe start $svc
+          for ($i = 1; $i -le 12; $i++) {
             Start-Sleep -Seconds 5
-            $final = (nssm status $svc).Trim()
-            if ($final -eq "SERVICE_RUNNING") { Write-Host "Service running"; break }
-            if ($i -eq 6) { Write-Error "Service failed to start: $final"; exit 1 }
+            $final = (sc.exe query $svc | Select-String "STATE").ToString()
+            if ($final -match "RUNNING") { Write-Host "Service running"; break }
+            if ($i -eq 12) { Write-Error "Service failed to start: $final"; exit 1 }
           }
           EOF
 
