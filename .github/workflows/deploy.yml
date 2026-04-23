@@ -55,16 +55,15 @@ jobs:
       - name: Write .env
         run: |
           ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          Set-Content -Path (Join-Path $HOME "artifacts\scraping.API\.env") -Value @"
-          PORT=${{ vars.SCRAPING_PORT }}
-          SCRAPER_API_KEY=${{ secrets.SCRAPER_API_KEY }}
-          FLIGHT_API_URL=${{ vars.FLIGHT_API_URL }}
-          FLIGHT_API_KEY=${{ secrets.FLIGHT_API_KEY }}
-          QUEUE_CONCURRENCY=${{ vars.QUEUE_CONCURRENCY }}
-          LOGS_DIR=./logs
-          LOG_LEVEL=${{ vars.LOG_LEVEL }}
-          LOG_PRETTY=false
-          "@
+          $p = Join-Path $HOME "artifacts\scraping.API\.env"
+          Set-Content  -Path $p -Value "PORT=${{ vars.SCRAPING_PORT }}"
+          Add-Content  -Path $p -Value "SCRAPER_API_KEY=${{ secrets.SCRAPER_API_KEY }}"
+          Add-Content  -Path $p -Value "FLIGHT_API_URL=${{ vars.FLIGHT_API_URL }}"
+          Add-Content  -Path $p -Value "FLIGHT_API_KEY=${{ secrets.FLIGHT_API_KEY }}"
+          Add-Content  -Path $p -Value "QUEUE_CONCURRENCY=${{ vars.QUEUE_CONCURRENCY }}"
+          Add-Content  -Path $p -Value "LOGS_DIR=./logs"
+          Add-Content  -Path $p -Value "LOG_LEVEL=${{ vars.LOG_LEVEL }}"
+          Add-Content  -Path $p -Value "LOG_PRETTY=false"
           EOF
 
       - name: Restart service
