@@ -16,6 +16,3 @@ export const logger = pino({
   }),
 });
 
-export function setLogLevel(verbose: boolean): void {
-  logger.level = verbose ? 'debug' : 'info';
-}
