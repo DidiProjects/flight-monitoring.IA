@@ -82,6 +82,88 @@
         "return": 148000,
         "type": "pts"
       }
+    },
+    "2026-04-23": {
+      "runCount": 1,
+      "best": {
+        "outbound": {
+          "pts": {
+            "amount": 146520,
+            "offer": {
+              "date": "2026-06-05",
+              "flightNumber": "AD8901",
+              "origin": {
+                "iata": "LIS",
+                "timestamp": "2026-06-05T13:20:00+01:00"
+              },
+              "destination": {
+                "iata": "VCP",
+                "timestamp": "2026-06-05T19:20:00-03:00"
+              },
+              "durationMin": 600,
+              "stops": 0,
+              "fares": {
+                "brl": {
+                  "amount": 2698.94,
+                  "currency": "BRL"
+                },
+                "points": {
+                  "amount": 146520,
+                  "currency": "PTS"
+                },
+                "hybrid": {
+                  "points": 11732,
+                  "cash": 2404.53,
+                  "currency": "BRL"
+                }
+              },
+              "isReturn": false,
+              "withinTarget": true
+            }
+          }
+        },
+        "return": {
+          "pts": {
+            "amount": 160000,
+            "offer": {
+              "date": "2026-07-09",
+              "flightNumber": "AD8750",
+              "origin": {
+                "iata": "VCP • 09/07",
+                "timestamp": "2026-07-09T18:10:00+00:00"
+              },
+              "destination": {
+                "iata": "LIS • 10/07",
+                "timestamp": "2026-07-09T08:00:00+00:00"
+              },
+              "durationMin": 590,
+              "stops": 0,
+              "fares": {
+                "brl": {
+                  "amount": 2719.52,
+                  "currency": "BRL"
+                },
+                "points": {
+                  "amount": 160000,
+                  "currency": "PTS"
+                },
+                "hybrid": {
+                  "points": 12800,
+                  "cash": 2407.42,
+                  "currency": "BRL"
+                }
+              },
+              "isReturn": true,
+              "withinTarget": true
+            }
+          }
+        }
+      },
+      "lastEmailed": {
+        "outbound": 146520,
+        "return": 160000,
+        "type": "pts"
+      }
     }
   }
 }
