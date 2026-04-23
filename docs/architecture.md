@@ -173,14 +173,16 @@ curl -o nssm.zip https://nssm.cc/release/nssm-2.24.zip
 Expand-Archive nssm.zip -DestinationPath C:\nssm
 copy C:\nssm\nssm-2.24\win64\nssm.exe C:\Windows\System32\
 
-nssm install scraping-api node
-nssm set scraping-api AppDirectory C:\Users\diego\projects\scraping.API
-nssm set scraping-api AppParameters "dist\main.js"
-nssm set scraping-api AppEnvironmentExtra "NODE_ENV=production"
+nssm install scraping-api "C:\Program Files\nodejs\node.exe"
+nssm set scraping-api AppParameters "--import file:///C:/Users/diego/artifacts/scraping.API/node_modules/tsx/dist/esm/index.cjs C:/Users/diego/artifacts/scraping.API/src/main.ts"
+nssm set scraping-api AppDirectory "C:\Users\diego\artifacts\scraping.API"
 nssm set scraping-api Start SERVICE_AUTO_START
-nssm set scraping-api AppStdout C:\Users\diego\projects\scraping.API\logs\service.log
-nssm set scraping-api AppStderr C:\Users\diego\projects\scraping.API\logs\service-error.log
+nssm set scraping-api AppStdout "C:\Users\diego\artifacts\scraping.API\logs\service.log"
+nssm set scraping-api AppStderr "C:\Users\diego\artifacts\scraping.API\logs\service-error.log"
+nssm set scraping-api AppStdoutCreationDisposition 4
+nssm set scraping-api AppStderrCreationDisposition 4
 
+New-Item -ItemType Directory -Path "C:\Users\diego\artifacts\scraping.API\logs" -Force
 nssm start scraping-api
 ```
 
