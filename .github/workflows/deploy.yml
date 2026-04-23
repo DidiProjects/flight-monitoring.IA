@@ -88,8 +88,8 @@ jobs:
       - name: Health check
         run: |
           ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          $port = $env:PORT ?? "3000"
-          $url  = "http://localhost:$port/health"
+          if ($env:PORT) { $port = $env:PORT } else { $port = "3000" }
+          $url = "http://localhost:$port/health"
           for ($i = 1; $i -le 6; $i++) {
             try {
               $res = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 5
