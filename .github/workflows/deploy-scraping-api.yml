@@ -1,0 +1,96 @@
+name: Deploy flightScraping.API
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_CLIENT_SECRET }}
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Ensure Windows VM is running
+        run: |
+          ssh -o StrictHostKeyChecking=no -p 1024 diego@${{ vars.TAILSCALE_IP }} "
+            virsh --connect qemu:///system start windows10 2>/dev/null || true
+            for i in \$(seq 1 24); do
+              sleep 5
+              if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 diego@192.168.122.224 'exit' 2>/dev/null; then
+                exit 0
+              fi
+            done
+            echo 'Windows VM did not respond after 2 minutes'
+            exit 1
+          "
+
+      - name: Sync and install
+        run: |
+          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
+          $projectDir = Join-Path $HOME "artifacts\flightScraping.API"
+          if (-not (Test-Path $projectDir)) {
+            New-Item -ItemType Directory -Path $projectDir -Force | Out-Null
+            git clone https://github.com/${{ github.repository }}.git $projectDir
+          }
+          Set-Location $projectDir
+          git pull
+          npm ci
+          EOF
+
+      - name: Restart service
+        run: |
+          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
+          $svc = "flight-scraping-api"
+          $status = nssm status $svc 2>$null
+          if ($status -eq "SERVICE_RUNNING" -or $status -eq "SERVICE_PAUSED") {
+            nssm restart $svc
+          } else {
+            nssm start $svc
+          }
+          Start-Sleep -Seconds 5
+          $final = nssm status $svc
+          if ($final -ne "SERVICE_RUNNING") {
+            Write-Error "Service failed to start: $final"
+            exit 1
+          }
+          EOF
+
+      - name: Health check
+        run: |
+          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
+          $port = $env:PORT ?? "3000"
+          $url  = "http://localhost:$port/health"
+          for ($i = 1; $i -le 6; $i++) {
+            try {
+              $res = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 5
+              if ($res.StatusCode -eq 200) { Write-Host "Health OK"; exit 0 }
+            } catch {}
+            Start-Sleep -Seconds 5
+          }
+          Write-Error "Health check failed after 30 seconds"
+          exit 1
+          EOF
+
+      - name: AI fallback, auto-fix scraper
+        if: failure()
+        run: |
+          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
+          Set-Location (Join-Path $HOME "artifacts\flightScraping.API")
+          $env:ANTHROPIC_API_KEY = '${{ secrets.ANTHROPIC_API_KEY }}'
+          npm run ai-fix
+          EOF
