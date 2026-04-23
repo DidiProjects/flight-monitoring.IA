@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { FlightOffer } from '../types/index.ts';
 
-const RESULTS_DIR = process.env['RESULTS_DIR'] ?? './results';
+const RESULTS_DIR = process.env['LOGS_DIR'] ?? './logs';
 const MAX_RUNS = 10;
 
 export interface RunContext {

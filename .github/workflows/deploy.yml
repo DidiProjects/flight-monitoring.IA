@@ -61,7 +61,7 @@ jobs:
           FLIGHT_API_URL=${{ vars.FLIGHT_API_URL }}
           FLIGHT_API_KEY=${{ secrets.FLIGHT_API_KEY }}
           QUEUE_CONCURRENCY=${{ vars.QUEUE_CONCURRENCY }}
-          RESULTS_DIR=./results
+          LOGS_DIR=./logs
           LOG_LEVEL=${{ vars.LOG_LEVEL }}
           LOG_PRETTY=false
           "@

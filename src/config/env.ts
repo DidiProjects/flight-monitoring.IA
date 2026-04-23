@@ -8,7 +8,7 @@ const schema = z.object({
   FLIGHT_API_URL:     z.string().url(),
   FLIGHT_API_KEY:     z.string().min(1),
   QUEUE_CONCURRENCY:  z.coerce.number().default(2),
-  RESULTS_DIR:        z.string().default('./results'),
+  LOGS_DIR:           z.string().default('./logs'),
   LOG_LEVEL:          z.string().default('info'),
   LOG_PRETTY:         z.string().default('false'),
   NODE_ENV:           z.string().default('development'),
