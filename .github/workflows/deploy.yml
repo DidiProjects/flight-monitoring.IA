@@ -84,9 +84,9 @@ jobs:
           sc.exe start $svc
           Start-Sleep -Seconds 15
           for ($i = 1; $i -le 12; $i++) {
-            $final = sc.exe query $svc
-            if ($final -match "RUNNING") { Write-Host "Service running"; break }
-            if ($i -eq 12) { Write-Error "Service failed to start"; exit 1 }
+            $state = (Get-Service -Name $svc).Status
+            if ($state -eq "Running") { Write-Host "Service running"; break }
+            if ($i -eq 12) { Write-Error "Service failed to start: $state"; exit 1 }
             Start-Sleep -Seconds 5
           }
           EOF
