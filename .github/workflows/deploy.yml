@@ -94,16 +94,22 @@ jobs:
       - name: Health check
         run: |
           ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          if ($env:PORT) { $port = $env:PORT } else { $port = "3000" }
+          $envFile = Join-Path $HOME "artifacts\scraping.API\.env"
+          $port = "3000"
+          if (Test-Path $envFile) {
+            $line = Get-Content $envFile | Where-Object { $_ -match "^PORT=" }
+            if ($line) { $port = ($line -split "=", 2)[1].Trim() }
+          }
           $url = "http://localhost:$port/health"
-          for ($i = 1; $i -le 6; $i++) {
+          Write-Host "Health check: $url"
+          for ($i = 1; $i -le 12; $i++) {
             try {
               $res = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 5
               if ($res.StatusCode -eq 200) { Write-Host "Health OK"; exit 0 }
-            } catch {}
+            } catch { Write-Host "Attempt $i failed: $_" }
             Start-Sleep -Seconds 5
           }
-          Write-Error "Health check failed after 30 seconds"
+          Write-Host "Health check failed after 60 seconds"
           exit 1
           EOF
 
