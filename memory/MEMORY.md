@@ -4,6 +4,9 @@
 - [Perfil do usuário](user-profile.md), Diego: dev TypeScript, iterativo, PT-BR, headless false, respostas curtas
 - [Preferências de desenvolvimento](feedback-dev-style.md), autonomia total, snapshots de diagnóstico, README como canal de instruções técnicas
 
+## Novos projetos (design aprovado)
+- [Design flight.API + flight.DB](flight-api-design.md), schema, rotas, fluxo de scrape, decisões aprovadas
+
 ## Projeto legado (branch antiga, antes da separação)
 - [flight.API legado](flight-api-legacy.md), state.json completo, lógica de notificação, template de email, deep-link Azul, o que muda no novo sistema
 
