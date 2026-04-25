@@ -5,7 +5,7 @@ import { logger } from '../../utils/logger.ts';
 import type { ScrapeRequest } from '../../types/scrape.ts';
 
 export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
-  const run = await createRun(request.origin, request.destination);
+  const run = await createRun(request.requestId, request.routineId, request.origin, request.destination);
   logger.info({ requestId: request.requestId, routineId: request.routineId, runDir: run.dir }, 'Scrape job started');
 
   try {

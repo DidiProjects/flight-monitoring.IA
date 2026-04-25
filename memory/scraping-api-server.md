@@ -42,13 +42,28 @@ POST {FLIGHT_API_URL}/scrape/results
 X-API-Key: {FLIGHT_API_KEY}
 Content-Type: application/json
 ```
-Body (`ScrapeResult`):
+Body (campos flat, mapeados de FlightOffer):
 ```typescript
 {
   requestId:   string;
+  routineId:   string;
   origin:      string;
   destination: string;
-  flights:     FlightOffer[];
+  flights: {
+    flightNumber:  string;
+    date:          string;          // "YYYY-MM-DD"
+    isReturn:      boolean;
+    origin:        string;          // IATA
+    departureTime: string;          // "HH:mm"
+    destination:   string;          // IATA
+    arrivalTime:   string;          // "HH:mm"
+    durationMin:   number;
+    stops:         number;
+    fareBrl:       number | null;
+    farePts:       number | null;
+    fareHybPts:    number | null;
+    fareHybBrl:    number | null;
+  }[];
   scrapedAt:   string;   // ISO 8601
   error?:      string;   // presente apenas em falha
 }
@@ -90,36 +105,46 @@ Usado no callback para flight.API.
 ## Variáveis de ambiente (obrigatórias)
 
 ```
-PORT=3000                 # porta do servidor
-SCRAPER_API_KEY=...       # chave para autenticar requests recebidos
-FLIGHT_API_URL=...        # URL base do flight.API (ex: http://192.168.122.1:4000)
-FLIGHT_API_KEY=...        # chave para autenticar o callback enviado ao flight.API
-QUEUE_CONCURRENCY=2       # jobs em paralelo
-LOGS_DIR=./logs           # diretório de runs/snapshots
+PORT=3000                         # porta do servidor
+SCRAPER_API_KEY=...               # chave para autenticar requests recebidos
+FLIGHT_API_URL=...                # URL base do flight.API (ex: http://192.168.122.1:4000)
+FLIGHT_API_KEY=...                # chave para autenticar o callback enviado ao flight.API
+QUEUE_CONCURRENCY=2               # jobs em paralelo
+RESULTS_DIR=C:\Users\diego\scraping-result   # diretório de runs/resultados
 LOG_LEVEL=info
 LOG_PRETTY=false
 ```
+Logs do processo (stdout/stderr) → `C:\Users\diego\logs\scraping-api\` via NSSM (não é env var).
 
-## Estrutura de logs/runs
+## Estrutura de resultados (RESULTS_DIR)
 
 ```
-logs/
-  2026-04-24T10-30-00/
-    results.json              ← { runAt, totalFound, results: FlightOffer[] }
-    snapshots/*.html          ← snapshot HTML por etapa
+scraping-result/
+  2026-04-25T10-30-00_a1b2c3d4_VCP-LIS/    ← ts + 8 chars requestId + rota
+    results.json    ← { requestId, routineId, origin, destination, runAt, totalFound, results: FlightOffer[] }
+    snapshots/      ← HTML snapshots por etapa do scraper
     errors/
-      execution.log
+      execution.log ← header com requestId/routineId + logs da run
       debug-*.png
       dom-*.html
-    2026-05-01/
-      VCP-LIS.json            ← FlightOffer[] por data/rota
 ```
-Mantém as 10 runs mais recentes (prune automático).
+Mantém as 10 runs mais recentes (prune automático via `pruneOldRuns()`).
 
-## AI Fallback
+## Deploy (bundle)
 
-`src/agent.ts`: ativado por `npm run ai-fix` no GHA quando `npm start` falha.
-- Modelo: claude-sonnet-4-6
-- Budget: 180k tokens, para em 25k restantes, max 10 iterações
-- Tools: bash, read_file, write_file, list_dir
-- Em sucesso: git add -A && git commit && git push
+- Build: `npm run build` → `dist/main.cjs` (esbuild, CJS minificado)
+- Externals não bundled: `playwright`, `camoufox-js`, `pino-pretty`
+- Estrutura no VM:
+  ```
+  artifacts/scraping-api/
+    .env                  ← escrito pelo deploy
+    node_modules/         ← instalado via npm ci, só quando package-lock muda
+    src/                  ← fonte deployada junto (para inspeção/debug)
+    dist/                 ← bundle ativo
+      main.cjs
+    dist-previous/        ← versão anterior (rollback)
+      main.cjs
+  logs/scraping-api/      ← fora de artifacts/
+  scraping-result/        ← fora de artifacts/
+  ```
+- NSSM: `node dist/main.cjs`, AppDirectory = `artifacts/scraping-api`

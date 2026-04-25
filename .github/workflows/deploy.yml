@@ -15,6 +15,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
@@ -39,63 +53,118 @@ jobs:
             exit 1
           "
 
-      - name: Sync and install
+      - name: Create deploy archive
+        run: tar czf deploy.tar.gz dist src package.json package-lock.json
+
+      - name: Upload archive to VM
         run: |
-          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          $projectDir = Join-Path $HOME "artifacts\scraping.API"
-          if (-not (Test-Path $projectDir)) {
-            New-Item -ItemType Directory -Path $projectDir -Force | Out-Null
-            git clone -b develop https://github.com/${{ github.repository }}.git $projectDir
+          scp -o StrictHostKeyChecking=no \
+              -o ProxyJump=diego@${{ vars.TAILSCALE_IP }}:1024 \
+              deploy.tar.gz \
+              diego@${{ vars.WINDOWS_VM_IP }}:~/deploy.tar.gz
+
+      - name: Stop service, rotate and install
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -J diego@${{ vars.TAILSCALE_IP }}:1024 \
+              diego@${{ vars.WINDOWS_VM_IP }} \
+              powershell -NoProfile -NonInteractive << 'EOF'
+          $base = Join-Path $HOME "artifacts\scraping-api"
+          New-Item -ItemType Directory -Force -Path $base | Out-Null
+
+          sc.exe stop scraping-api 2>$null
+          Start-Sleep -Seconds 3
+
+          # Extract archive to staging area
+          $staging = "$base\_staging"
+          New-Item -ItemType Directory -Force -Path $staging | Out-Null
+          Set-Location $staging
+          tar xzf (Join-Path $HOME "deploy.tar.gz")
+          Remove-Item (Join-Path $HOME "deploy.tar.gz") -Force
+
+          # Install deps only when package-lock changed
+          $hashPath = "$base\.npm-lock-hash"
+          $newHash = (Get-FileHash "$staging\package-lock.json" -Algorithm SHA256).Hash
+          $oldHash = if (Test-Path $hashPath) { Get-Content $hashPath } else { "" }
+          if ($newHash -ne $oldHash) {
+            Write-Host "Dependencies changed, running npm ci..."
+            Copy-Item "$staging\package.json"      "$base\package.json"      -Force
+            Copy-Item "$staging\package-lock.json" "$base\package-lock.json" -Force
+            Set-Location $base
+            npm ci
+            Set-Content $hashPath $newHash
+            Write-Host "npm ci complete"
+          } else {
+            Write-Host "Dependencies unchanged"
           }
-          Set-Location $projectDir
-          git pull
-          npm ci
+
+          # Rotate bundles: dist -> dist-previous
+          $prev = "$base\dist-previous"
+          $curr = "$base\dist"
+          if (Test-Path $prev) { Remove-Item $prev -Recurse -Force }
+          if (Test-Path $curr) { Rename-Item $curr $prev }
+          Move-Item "$staging\dist" $curr
+
+          # Update source files
+          if (Test-Path "$base\src") { Remove-Item "$base\src" -Recurse -Force }
+          Move-Item "$staging\src" "$base\src"
+
+          Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host "Rotation complete"
           EOF
 
       - name: Write .env
         run: |
-          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          $p = Join-Path $HOME "artifacts\scraping.API\.env"
+          ssh -o StrictHostKeyChecking=no \
+              -J diego@${{ vars.TAILSCALE_IP }}:1024 \
+              diego@${{ vars.WINDOWS_VM_IP }} \
+              powershell -NoProfile -NonInteractive << 'EOF'
+          $p = Join-Path $HOME "artifacts\scraping-api\.env"
           Set-Content  -Path $p -Value "PORT=${{ vars.SCRAPING_PORT }}"
           Add-Content  -Path $p -Value "SCRAPER_API_KEY=${{ secrets.SCRAPER_API_KEY }}"
           Add-Content  -Path $p -Value "FLIGHT_API_URL=${{ vars.FLIGHT_API_URL }}"
           Add-Content  -Path $p -Value "FLIGHT_API_KEY=${{ secrets.FLIGHT_API_KEY }}"
           Add-Content  -Path $p -Value "QUEUE_CONCURRENCY=${{ vars.QUEUE_CONCURRENCY }}"
-          Add-Content  -Path $p -Value "LOGS_DIR=./logs"
+          Add-Content  -Path $p -Value "RESULTS_DIR=C:\Users\diego\scraping-result"
           Add-Content  -Path $p -Value "LOG_LEVEL=${{ vars.LOG_LEVEL }}"
           Add-Content  -Path $p -Value "LOG_PRETTY=false"
           EOF
 
       - name: Reconfigure NSSM
         run: |
-          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          $dir = Join-Path $HOME "artifacts\scraping.API"
-          nssm set scraping-api Application "C:\Program Files\nodejs\node.exe"
-          nssm set scraping-api AppParameters "--import file:///C:/Users/diego/artifacts/scraping.API/node_modules/tsx/dist/esm/index.cjs C:/Users/diego/artifacts/scraping.API/src/main.ts"
-          nssm set scraping-api AppDirectory $dir
+          ssh -o StrictHostKeyChecking=no \
+              -J diego@${{ vars.TAILSCALE_IP }}:1024 \
+              diego@${{ vars.WINDOWS_VM_IP }} \
+              powershell -NoProfile -NonInteractive << 'EOF'
+          $base    = Join-Path $HOME "artifacts\scraping-api"
+          $logsDir = Join-Path $HOME "logs\scraping-api"
+          $results = Join-Path $HOME "scraping-result"
+
+          New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $results  | Out-Null
+
+          nssm set scraping-api Application    "C:\Program Files\nodejs\node.exe"
+          nssm set scraping-api AppParameters  "$base\dist\main.cjs"
+          nssm set scraping-api AppDirectory   $base
+          nssm set scraping-api AppStdout      "$logsDir\service.log"
+          nssm set scraping-api AppStderr      "$logsDir\service-error.log"
+          nssm set scraping-api AppRotateFiles 1
+          nssm set scraping-api AppRotateSeconds 86400
+          nssm set scraping-api AppRotateBytes   10485760
+          Write-Host "NSSM configured"
           EOF
 
-      - name: Restart service
+      - name: Start service and health check
         run: |
-          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          $svc = "scraping-api"
-          sc.exe stop $svc 2>$null
-          Start-Sleep -Seconds 3
-          sc.exe start $svc
-          Start-Sleep -Seconds 15
-          for ($i = 1; $i -le 12; $i++) {
-            $state = (Get-Service -Name $svc).Status
-            if ($state -eq "Running") { Write-Host "Service running"; break }
-            if ($i -eq 12) { Write-Error "Service failed to start: $state"; exit 1 }
-            Start-Sleep -Seconds 5
-          }
-          EOF
+          ssh -o StrictHostKeyChecking=no \
+              -J diego@${{ vars.TAILSCALE_IP }}:1024 \
+              diego@${{ vars.WINDOWS_VM_IP }} \
+              powershell -NoProfile -NonInteractive << 'EOF'
+          sc.exe start scraping-api
+          Start-Sleep -Seconds 10
 
-      - name: Health check
-        run: |
-          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          $envFile = Join-Path $HOME "artifacts\scraping.API\.env"
           $port = "3000"
+          $envFile = Join-Path $HOME "artifacts\scraping-api\.env"
           if (Test-Path $envFile) {
             $line = Get-Content $envFile | Where-Object { $_ -match "^PORT=" }
             if ($line) { $port = ($line -split "=", 2)[1].Trim() }
@@ -111,13 +180,4 @@ jobs:
           }
           Write-Host "Health check failed after 60 seconds"
           exit 1
-          EOF
-
-      - name: AI fallback, auto-fix scraper
-        if: failure()
-        run: |
-          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          Set-Location (Join-Path $HOME "artifacts\scraping.API")
-          $env:ANTHROPIC_API_KEY = '${{ secrets.ANTHROPIC_API_KEY }}'
-          npm run ai-fix
           EOF

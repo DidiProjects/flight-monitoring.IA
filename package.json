@@ -7,9 +7,9 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "start": "tsx src/main.ts",
+    "start": "node dist/main.cjs",
     "dev": "tsx --watch src/main.ts",
-    "ai-fix": "tsx src/agent.ts",
+    "build": "esbuild src/main.ts --bundle --platform=node --format=cjs --minify --outfile=dist/main.cjs --external:playwright --external:camoufox-js --external:pino-pretty",
     "postinstall": "npx camoufox-js fetch"
   },
   "dependencies": {
@@ -28,6 +28,7 @@
   "devDependencies": {
     "@tsconfig/node22": "^22.0.0",
     "@types/node": "^22.19.17",
+    "esbuild": "^0.25.0",
     "typescript": "^5.8.3"
   }
 }

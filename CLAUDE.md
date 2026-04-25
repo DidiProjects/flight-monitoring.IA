@@ -1,14 +1,15 @@
 # flight.API, Instruções para Claude
 
-## Arquitetura atual (2026-04-21)
+## Arquitetura atual (2026-04-25)
 
 - **Sem Docker**, scraper roda direto com Node.js 22 no servidor via SSH
-- **Deploy:** GitHub Actions → rsync → `npm ci` → `npm start`
-- **AI Fallback:** quando `npm start` falha com erro real (não consulta vazia) →
-  GHA executa `npm run ai-fix` → `src/agent.ts` usa Claude API (claude-sonnet-4-6)
-  para diagnosticar, corrigir `azul.ts`, retestar e commitar automaticamente
-- **Secret necessário no GHA:** `ANTHROPIC_API_KEY`
-- **Servidor:** precisa de git configurado com push access ao repo
+- **Bundle:** TypeScript compilado no runner do GHA com esbuild → `dist/main.cjs` (CJS minificado, single file)
+- **Deploy:** GHA checkout → `npm ci` → `npm run build` → tar (bundle + src + packages) → SCP para VM → rotação de versões
+- **Versões no VM:** `artifacts/scraping-api/dist/` (ativo) + `dist-previous/` (rollback). Sem git no VM.
+- **NSSM:** `node dist/main.cjs` com `AppDirectory = artifacts/scraping-api` (o `.env` fica nessa raiz, lido via `process.cwd()`)
+- **Logs do processo:** stdout/stderr → `C:\Users\diego\logs\scraping-api\` (configurado via NSSM AppStdout/AppStderr + rotação)
+- **Resultados de scrape:** `C:\Users\diego\scraping-result\` (env `RESULTS_DIR`), máx 10 runs
+- **Deps externas (não bundled):** `playwright`, `camoufox-js`, `pino-pretty` — instaladas em `artifacts/scraping-api/node_modules/`, reinsaladas apenas quando `package-lock.json` muda
 
 ## Início de cada sessão
 
