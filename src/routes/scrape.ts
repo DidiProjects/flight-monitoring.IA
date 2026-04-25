@@ -6,6 +6,7 @@ import { runScrapeJob } from '../services/scraper/runner.ts';
 
 const ScrapeRequestSchema = z.object({
   requestId:     z.string().uuid(),
+  routineId:     z.string().uuid(),
   origin:        z.string().length(3),
   destination:   z.string().length(3),
   outboundStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

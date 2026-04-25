@@ -6,7 +6,7 @@ import type { ScrapeRequest } from '../../types/scrape.ts';
 
 export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
   const run = await createRun(request.origin, request.destination);
-  logger.info({ requestId: request.requestId, runDir: run.dir }, 'Scrape job started');
+  logger.info({ requestId: request.requestId, routineId: request.routineId, runDir: run.dir }, 'Scrape job started');
 
   try {
     const flights = await searchFlights({
@@ -22,22 +22,24 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
 
     await saveResults(run, flights);
     await sendResult({
-      requestId: request.requestId,
-      origin: request.origin,
+      requestId:   request.requestId,
+      routineId:   request.routineId,
+      origin:      request.origin,
       destination: request.destination,
       flights,
-      scrapedAt: new Date().toISOString(),
+      scrapedAt:   new Date().toISOString(),
     });
   } catch (err) {
     await run.saveError(err);
-    logger.error({ requestId: request.requestId, err }, 'Scrape job failed');
+    logger.error({ requestId: request.requestId, routineId: request.routineId, err }, 'Scrape job failed');
     await sendResult({
-      requestId: request.requestId,
-      origin: request.origin,
+      requestId:   request.requestId,
+      routineId:   request.routineId,
+      origin:      request.origin,
       destination: request.destination,
-      flights: [],
-      scrapedAt: new Date().toISOString(),
-      error: err instanceof Error ? err.message : String(err),
+      flights:     [],
+      scrapedAt:   new Date().toISOString(),
+      error:       err instanceof Error ? err.message : String(err),
     });
   } finally {
     await pruneOldRuns();

@@ -2,6 +2,7 @@ import type { FlightOffer } from './index.ts';
 
 export interface ScrapeRequest {
   requestId: string;
+  routineId: string;
   origin: string;
   destination: string;
   outboundStart: string;
@@ -13,6 +14,7 @@ export interface ScrapeRequest {
 
 export interface ScrapeResult {
   requestId: string;
+  routineId: string;
   origin: string;
   destination: string;
   flights: FlightOffer[];
