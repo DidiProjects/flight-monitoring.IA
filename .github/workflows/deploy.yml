@@ -55,49 +55,61 @@ jobs:
       - name: Write .env
         run: |
           ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          Set-Content -Path (Join-Path $HOME "artifacts\scraping.API\.env") -Value @"
-          PORT=${{ vars.SCRAPING_PORT }}
-          SCRAPER_API_KEY=${{ secrets.SCRAPER_API_KEY }}
-          FLIGHT_API_URL=${{ vars.FLIGHT_API_URL }}
-          FLIGHT_API_KEY=${{ secrets.FLIGHT_API_KEY }}
-          QUEUE_CONCURRENCY=${{ vars.QUEUE_CONCURRENCY }}
-          LOGS_DIR=./logs
-          LOG_LEVEL=${{ vars.LOG_LEVEL }}
-          LOG_PRETTY=false
-          "@
+          $p = Join-Path $HOME "artifacts\scraping.API\.env"
+          Set-Content  -Path $p -Value "PORT=${{ vars.SCRAPING_PORT }}"
+          Add-Content  -Path $p -Value "SCRAPER_API_KEY=${{ secrets.SCRAPER_API_KEY }}"
+          Add-Content  -Path $p -Value "FLIGHT_API_URL=${{ vars.FLIGHT_API_URL }}"
+          Add-Content  -Path $p -Value "FLIGHT_API_KEY=${{ secrets.FLIGHT_API_KEY }}"
+          Add-Content  -Path $p -Value "QUEUE_CONCURRENCY=${{ vars.QUEUE_CONCURRENCY }}"
+          Add-Content  -Path $p -Value "LOGS_DIR=./logs"
+          Add-Content  -Path $p -Value "LOG_LEVEL=${{ vars.LOG_LEVEL }}"
+          Add-Content  -Path $p -Value "LOG_PRETTY=false"
+          EOF
+
+      - name: Reconfigure NSSM
+        run: |
+          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
+          $dir = Join-Path $HOME "artifacts\scraping.API"
+          nssm set scraping-api Application "C:\Program Files\nodejs\node.exe"
+          nssm set scraping-api AppParameters "--import file:///C:/Users/diego/artifacts/scraping.API/node_modules/tsx/dist/esm/index.cjs C:/Users/diego/artifacts/scraping.API/src/main.ts"
+          nssm set scraping-api AppDirectory $dir
           EOF
 
       - name: Restart service
         run: |
           ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
           $svc = "scraping-api"
-          $status = nssm status $svc 2>$null
-          if ($status -eq "SERVICE_RUNNING" -or $status -eq "SERVICE_PAUSED") {
-            nssm restart $svc
-          } else {
-            nssm start $svc
-          }
-          Start-Sleep -Seconds 5
-          $final = nssm status $svc
-          if ($final -ne "SERVICE_RUNNING") {
-            Write-Error "Service failed to start: $final"
-            exit 1
+          sc.exe stop $svc 2>$null
+          Start-Sleep -Seconds 3
+          sc.exe start $svc
+          Start-Sleep -Seconds 15
+          for ($i = 1; $i -le 12; $i++) {
+            $state = (Get-Service -Name $svc).Status
+            if ($state -eq "Running") { Write-Host "Service running"; break }
+            if ($i -eq 12) { Write-Error "Service failed to start: $state"; exit 1 }
+            Start-Sleep -Seconds 5
           }
           EOF
 
       - name: Health check
         run: |
           ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          $port = $env:PORT ?? "3000"
-          $url  = "http://localhost:$port/health"
-          for ($i = 1; $i -le 6; $i++) {
+          $envFile = Join-Path $HOME "artifacts\scraping.API\.env"
+          $port = "3000"
+          if (Test-Path $envFile) {
+            $line = Get-Content $envFile | Where-Object { $_ -match "^PORT=" }
+            if ($line) { $port = ($line -split "=", 2)[1].Trim() }
+          }
+          $url = "http://localhost:$port/health"
+          Write-Host "Health check: $url"
+          for ($i = 1; $i -le 12; $i++) {
             try {
               $res = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 5
               if ($res.StatusCode -eq 200) { Write-Host "Health OK"; exit 0 }
-            } catch {}
+            } catch { Write-Host "Attempt $i failed: $_" }
             Start-Sleep -Seconds 5
           }
-          Write-Error "Health check failed after 30 seconds"
+          Write-Host "Health check failed after 60 seconds"
           exit 1
           EOF
 
