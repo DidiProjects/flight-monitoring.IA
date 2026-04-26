@@ -59,6 +59,13 @@ export async function createRun(
   return { dir, requestId, routineId, origin, destination, log, saveError };
 }
 
+export async function saveResponse(ctx: RunContext, payload: unknown): Promise<void> {
+  await fs.writeFile(
+    path.join(ctx.dir, 'response.json'),
+    JSON.stringify(payload, null, 2),
+  );
+}
+
 export async function saveResults(ctx: RunContext, results: FlightOffer[]): Promise<void> {
   await fs.writeFile(
     path.join(ctx.dir, 'results.json'),

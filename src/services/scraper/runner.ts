@@ -1,12 +1,18 @@
 import { searchFlights } from '../../scrapers/azul.ts';
-import { sendResult } from '../result/sender.ts';
-import { createRun, saveResults, pruneOldRuns } from '../../utils/runs.ts';
+import { buildCallbackPayload, sendResult } from '../result/sender.ts';
+import { createRun, saveResults, saveResponse, pruneOldRuns } from '../../utils/runs.ts';
 import { logger } from '../../utils/logger.ts';
-import type { ScrapeRequest } from '../../types/scrape.ts';
+import type { ScrapeRequest, ScrapeResult } from '../../types/scrape.ts';
 
 export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
   const run = await createRun(request.requestId, request.routineId, request.origin, request.destination);
   logger.info({ requestId: request.requestId, routineId: request.routineId, runDir: run.dir }, 'Scrape job started');
+
+  const send = async (result: ScrapeResult) => {
+    const payload = buildCallbackPayload(result);
+    await saveResponse(run, payload);
+    await sendResult(result);
+  };
 
   try {
     if (request.airline !== 'azul') {
@@ -14,18 +20,18 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
     }
 
     const flights = await searchFlights({
-      origin: request.origin,
-      destination: request.destination,
+      origin:        request.origin,
+      destination:   request.destination,
       outboundStart: request.outboundStart,
-      outboundEnd: request.outboundEnd,
-      returnStart: request.returnStart,
-      returnEnd: request.returnEnd,
-      passengers: request.passengers,
-      runDir: run.dir,
+      outboundEnd:   request.outboundEnd,
+      returnStart:   request.returnStart,
+      returnEnd:     request.returnEnd,
+      passengers:    request.passengers,
+      runDir:        run.dir,
     });
 
     await saveResults(run, flights);
-    await sendResult({
+    await send({
       requestId:   request.requestId,
       routineId:   request.routineId,
       origin:      request.origin,
@@ -36,7 +42,7 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
   } catch (err) {
     await run.saveError(err);
     logger.error({ requestId: request.requestId, routineId: request.routineId, err }, 'Scrape job failed');
-    await sendResult({
+    await send({
       requestId:   request.requestId,
       routineId:   request.routineId,
       origin:      request.origin,

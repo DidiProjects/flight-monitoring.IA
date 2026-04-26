@@ -22,8 +22,8 @@ function toCallbackOffer(offer: FlightOffer) {
   };
 }
 
-export async function sendResult(result: ScrapeResult): Promise<void> {
-  const payload = {
+export function buildCallbackPayload(result: ScrapeResult) {
+  return {
     requestId:   result.requestId,
     routineId:   result.routineId,
     origin:      result.origin,
@@ -32,6 +32,10 @@ export async function sendResult(result: ScrapeResult): Promise<void> {
     scrapedAt:   result.scrapedAt,
     error:       result.error,
   };
+}
+
+export async function sendResult(result: ScrapeResult): Promise<void> {
+  const payload = buildCallbackPayload(result);
   await post(`${env.FLIGHT_API_URL}/scrape/results`, payload, env.FLIGHT_API_KEY);
   logger.info({ requestId: result.requestId, routineId: result.routineId }, 'Result sent to flight.API');
 }
