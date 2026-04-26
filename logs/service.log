@@ -1,0 +1,20 @@
+◇ injected env (8) from .env // tip: ⌘ suppress logs { quiet: true }
+{"level":30,"time":1776982098732,"pid":2376,"hostname":"DESKTOP-CHK9QJP","port":3000,"msg":"scraping.API started"}
+◇ injected env (8) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+{"level":30,"time":1776983609511,"pid":3172,"hostname":"DESKTOP-CHK9QJP","port":3000,"msg":"scraping.API started"}
+◇ injected env (8) from .env // tip: ⌘ suppress logs { quiet: true }
+{"level":30,"time":1776984248014,"pid":4348,"hostname":"DESKTOP-CHK9QJP","port":3000,"msg":"scraping.API started"}
+◇ injected env (8) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+{"level":30,"time":1776984484148,"pid":4104,"hostname":"DESKTOP-CHK9QJP","port":3000,"msg":"scraping.API started"}
+◇ injected env (8) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+{"level":30,"time":1776984613440,"pid":3392,"hostname":"DESKTOP-CHK9QJP","port":3000,"msg":"scraping.API started"}
+◇ injected env (8) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+{"level":30,"time":1776985013411,"pid":4476,"hostname":"DESKTOP-CHK9QJP","port":3000,"msg":"scraping.API started"}
+◇ injected env (8) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+{"level":30,"time":1776985473535,"pid":4560,"hostname":"DESKTOP-CHK9QJP","port":3000,"msg":"scraping.API started"}
+◇ injected env (8) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+{"level":30,"time":1776997345489,"pid":2940,"hostname":"DESKTOP-CHK9QJP","port":3000,"msg":"scraping.API started"}
+◇ injected env (8) from .env // tip: ⌘ suppress logs { quiet: true }
+{"level":30,"time":1776997418405,"pid":2380,"hostname":"DESKTOP-CHK9QJP","port":3000,"msg":"scraping.API started"}
+◇ injected env (8) from .env // tip: ⌘ enable debugging { debug: true }
+{"level":30,"time":1777072477511,"pid":2460,"hostname":"DESKTOP-CHK9QJP","port":3000,"msg":"scraping.API started"}

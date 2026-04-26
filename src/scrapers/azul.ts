@@ -11,7 +11,7 @@ import { dateRange } from '../utils/dates.ts';
 import { logger } from '../utils/logger.ts';
 import { acceptCookies } from '../browser/cookies.ts';
 import { humanDelay } from '../browser/human.ts';
-import type { FlightOffer, FlightFares, SearchParams } from '../types/index.ts';
+import type { FlightOffer, FlightFares, ScraperParams } from '../types/index.ts';
 
 // ── Airport timezone offsets ──────────────────────────────────────────────────
 // Static offsets (summer/DST not auto-adjusted, accurate enough for itinerary display)
@@ -57,7 +57,7 @@ function buildSearchUrl(origin: string, destination: string, date: string, curre
 
 // ── Main entry ────────────────────────────────────────────────────────────────
 
-export async function searchFlights(params: SearchParams): Promise<FlightOffer[]> {
+export async function searchFlights(params: ScraperParams): Promise<FlightOffer[]> {
   const foxOptions = await camoufoxLaunchOptions({
     headless: true,
     os: 'windows',
@@ -98,7 +98,7 @@ async function searchRoute(
   destination: string,
   startDate: string,
   endDate: string,
-  params: SearchParams,
+  params: ScraperParams,
   isReturn: boolean,
 ): Promise<FlightOffer[]> {
   const context = await browser.newContext(contextOptions);
@@ -720,8 +720,7 @@ async function collectAllFares(
       durationMin,
       stops,
       fares,
-      isReturn:     false,
-      withinTarget: false,
+      isReturn: false,
     });
   }
 

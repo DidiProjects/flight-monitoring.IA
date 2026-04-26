@@ -1,0 +1,41 @@
+import { env } from '../../config/env.ts';
+import { post } from '../../http/client.ts';
+import { logger } from '../../utils/logger.ts';
+import type { ScrapeResult } from '../../types/scrape.ts';
+import type { FlightOffer } from '../../types/index.ts';
+
+function toCallbackOffer(offer: FlightOffer) {
+  return {
+    flightNumber:  offer.flightNumber,
+    date:          offer.date,
+    isReturn:      offer.isReturn,
+    origin:        offer.origin.iata,
+    departureTime: offer.origin.timestamp.slice(11, 16),
+    destination:   offer.destination.iata,
+    arrivalTime:   offer.destination.timestamp.slice(11, 16),
+    durationMin:   offer.durationMin,
+    stops:         offer.stops,
+    fareBrl:       offer.fares.brl?.amount    ?? null,
+    farePts:       offer.fares.points?.amount ?? null,
+    fareHybPts:    offer.fares.hybrid?.points ?? null,
+    fareHybBrl:    offer.fares.hybrid?.cash   ?? null,
+  };
+}
+
+export function buildCallbackPayload(result: ScrapeResult) {
+  return {
+    requestId:   result.requestId,
+    routineId:   result.routineId,
+    origin:      result.origin,
+    destination: result.destination,
+    flights:     result.flights.map(toCallbackOffer),
+    scrapedAt:   result.scrapedAt,
+    error:       result.error,
+  };
+}
+
+export async function sendResult(result: ScrapeResult): Promise<void> {
+  const payload = buildCallbackPayload(result);
+  await post(`${env.FLIGHT_API_URL}/scrape/results`, payload, env.FLIGHT_API_KEY);
+  logger.info({ requestId: result.requestId, routineId: result.routineId }, 'Result sent to flight.API');
+}

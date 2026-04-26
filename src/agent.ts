@@ -24,7 +24,7 @@ const TOKEN_BUDGET  = 180_000;
 const STOP_TOKENS   = 25_000;
 const MAX_ITERS     = 10;
 const MODEL         = 'claude-sonnet-4-6';
-const RESULTS_DIR   = process.env['RESULTS_DIR'] ?? './results';
+const RESULTS_DIR   = process.env['LOGS_DIR'] ?? './logs';
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
 

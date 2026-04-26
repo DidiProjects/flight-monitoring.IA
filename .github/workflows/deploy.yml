@@ -1,16 +1,34 @@
-name: Deploy to Server
+name: Deploy scraping.API
 
 on:
   workflow_dispatch:
-  schedule:
-    # Executa a cada hora
-    - cron: '0 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
@@ -20,11 +38,6 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.1
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: main
 
       - name: Ensure Windows VM is running
         run: |
@@ -40,74 +53,131 @@ jobs:
             exit 1
           "
 
-      - name: Sync and install
+      - name: Create deploy archive
+        run: tar czf deploy.tar.gz dist src package.json package-lock.json
+
+      - name: Upload archive to VM
         run: |
-          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          $projectDir = Join-Path $HOME "projects\flight.API"
-          if (-not (Test-Path $projectDir)) {
-            git clone https://github.com/${{ github.repository }}.git $projectDir
+          scp -o StrictHostKeyChecking=no \
+              -o ProxyJump=diego@${{ vars.TAILSCALE_IP }}:1024 \
+              deploy.tar.gz \
+              diego@${{ vars.WINDOWS_VM_IP }}:~/deploy.tar.gz
+
+      - name: Stop service, rotate and install
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -J diego@${{ vars.TAILSCALE_IP }}:1024 \
+              diego@${{ vars.WINDOWS_VM_IP }} \
+              powershell -NoProfile -NonInteractive << 'EOF'
+          $base = Join-Path $HOME "artifacts\scraping-api"
+          New-Item -ItemType Directory -Force -Path $base | Out-Null
+
+          sc.exe stop scraping-api 2>$null
+          Start-Sleep -Seconds 3
+
+          # Extract archive to staging area
+          $staging = "$base\_staging"
+          New-Item -ItemType Directory -Force -Path $staging | Out-Null
+          Set-Location $staging
+          tar xzf (Join-Path $HOME "deploy.tar.gz")
+          Remove-Item (Join-Path $HOME "deploy.tar.gz") -Force
+
+          # Install deps only when package-lock changed
+          $hashPath = "$base\.npm-lock-hash"
+          $newHash = (Get-FileHash "$staging\package-lock.json" -Algorithm SHA256).Hash
+          $oldHash = if (Test-Path $hashPath) { Get-Content $hashPath } else { "" }
+          if ($newHash -ne $oldHash) {
+            Write-Host "Dependencies changed, running npm ci..."
+            Copy-Item "$staging\package.json"      "$base\package.json"      -Force
+            Copy-Item "$staging\package-lock.json" "$base\package-lock.json" -Force
+            Set-Location $base
+            npm ci
+            Set-Content $hashPath $newHash
+            Write-Host "npm ci complete"
+          } else {
+            Write-Host "Dependencies unchanged"
           }
-          Set-Location $projectDir
-          git pull
-          npm ci
+
+          # Rotate bundles: dist -> dist-previous
+          $prev = "$base\dist-previous"
+          $curr = "$base\dist"
+          if (Test-Path $prev) { Remove-Item $prev -Recurse -Force }
+          if (Test-Path $curr) { Rename-Item $curr $prev }
+          Move-Item "$staging\dist" $curr
+
+          # Update source files
+          if (Test-Path "$base\src") { Remove-Item "$base\src" -Recurse -Force }
+          Move-Item "$staging\src" "$base\src"
+
+          Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host "Rotation complete"
           EOF
 
-      - name: Run flight search
+      - name: Write .env
         run: |
-          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          Set-Location (Join-Path $HOME "projects\flight.API")
-          $env:RESULTS_DIR            = './results'
-          $env:FLIGHT_ORIGIN          = '${{ vars.FLIGHT_ORIGIN }}'
-          $env:FLIGHT_DESTINATION     = '${{ vars.FLIGHT_DESTINATION }}'
-          $env:FLIGHT_TARGET_BRL      = '${{ vars.FLIGHT_TARGET_BRL }}'
-          $env:FLIGHT_TARGET_PTS      = '${{ vars.FLIGHT_TARGET_PTS }}'
-          $env:FLIGHT_TARGET_HYB_PTS  = '${{ vars.FLIGHT_TARGET_HYB_PTS }}'
-          $env:FLIGHT_TARGET_HYB_BRL  = '${{ vars.FLIGHT_TARGET_HYB_BRL }}'
-          $env:FLIGHT_MARGIN          = '${{ vars.FLIGHT_MARGIN }}'
-          $env:FLIGHT_OUTBOUND_START  = '${{ vars.FLIGHT_OUTBOUND_START }}'
-          $env:FLIGHT_OUTBOUND_END    = '${{ vars.FLIGHT_OUTBOUND_END }}'
-          $env:FLIGHT_RETURN_START    = '${{ vars.FLIGHT_RETURN_START }}'
-          $env:FLIGHT_RETURN_END      = '${{ vars.FLIGHT_RETURN_END }}'
-          $env:FLIGHT_PASSENGERS      = '${{ vars.FLIGHT_PASSENGERS }}'
-          $env:FLIGHT_VERBOSE         = '${{ vars.FLIGHT_VERBOSE }}'
-          $env:LOG_LEVEL              = '${{ vars.LOG_LEVEL }}'
-          $env:EMAIL_ENABLED          = '${{ vars.EMAIL_ENABLED }}'
-          $env:EMAIL_RECIPIENT        = '${{ vars.EMAIL_RECIPIENT }}'
-          $env:EMAIL_CC               = '${{ vars.EMAIL_CC }}'
-          $env:EMAIL_SMTP_HOST        = '${{ vars.EMAIL_SMTP_HOST }}'
-          $env:EMAIL_SMTP_PORT        = '${{ vars.EMAIL_SMTP_PORT }}'
-          $env:EMAIL_SMTP_USER        = '${{ secrets.EMAIL_SMTP_USER }}'
-          $env:EMAIL_SMTP_PASSWORD    = '${{ secrets.EMAIL_SMTP_PASSWORD }}'
-          npm start
+          ssh -o StrictHostKeyChecking=no \
+              -J diego@${{ vars.TAILSCALE_IP }}:1024 \
+              diego@${{ vars.WINDOWS_VM_IP }} \
+              powershell -NoProfile -NonInteractive << 'EOF'
+          $p = Join-Path $HOME "artifacts\scraping-api\.env"
+          Set-Content  -Path $p -Value "PORT=${{ vars.SCRAPING_PORT }}"
+          Add-Content  -Path $p -Value "SCRAPER_API_KEY=${{ secrets.SCRAPER_API_KEY }}"
+          Add-Content  -Path $p -Value "FLIGHT_API_URL=${{ vars.FLIGHT_API_URL }}"
+          Add-Content  -Path $p -Value "FLIGHT_API_KEY=${{ secrets.FLIGHT_API_KEY }}"
+          Add-Content  -Path $p -Value "QUEUE_CONCURRENCY=${{ vars.QUEUE_CONCURRENCY }}"
+          Add-Content  -Path $p -Value "RESULTS_DIR=C:\Users\diego\scraping-result"
+          Add-Content  -Path $p -Value "LOG_LEVEL=${{ vars.LOG_LEVEL }}"
+          Add-Content  -Path $p -Value "LOG_PRETTY=false"
           EOF
 
-      - name: AI fallback, auto-fix scraper
-        if: failure()
+      - name: Reconfigure NSSM
         run: |
-          ssh -o StrictHostKeyChecking=no -J diego@${{ vars.TAILSCALE_IP }}:1024 diego@${{ vars.WINDOWS_VM_IP }} powershell -NoProfile -NonInteractive << 'EOF'
-          Set-Location (Join-Path $HOME "projects\flight.API")
-          $env:RESULTS_DIR            = './results'
-          $env:FLIGHT_ORIGIN          = '${{ vars.FLIGHT_ORIGIN }}'
-          $env:FLIGHT_DESTINATION     = '${{ vars.FLIGHT_DESTINATION }}'
-          $env:FLIGHT_TARGET_BRL      = '${{ vars.FLIGHT_TARGET_BRL }}'
-          $env:FLIGHT_TARGET_PTS      = '${{ vars.FLIGHT_TARGET_PTS }}'
-          $env:FLIGHT_TARGET_HYB_PTS  = '${{ vars.FLIGHT_TARGET_HYB_PTS }}'
-          $env:FLIGHT_TARGET_HYB_BRL  = '${{ vars.FLIGHT_TARGET_HYB_BRL }}'
-          $env:FLIGHT_MARGIN          = '${{ vars.FLIGHT_MARGIN }}'
-          $env:FLIGHT_OUTBOUND_START  = '${{ vars.FLIGHT_OUTBOUND_START }}'
-          $env:FLIGHT_OUTBOUND_END    = '${{ vars.FLIGHT_OUTBOUND_END }}'
-          $env:FLIGHT_RETURN_START    = '${{ vars.FLIGHT_RETURN_START }}'
-          $env:FLIGHT_RETURN_END      = '${{ vars.FLIGHT_RETURN_END }}'
-          $env:FLIGHT_PASSENGERS      = '${{ vars.FLIGHT_PASSENGERS }}'
-          $env:FLIGHT_VERBOSE         = '${{ vars.FLIGHT_VERBOSE }}'
-          $env:LOG_LEVEL              = '${{ vars.LOG_LEVEL }}'
-          $env:EMAIL_ENABLED          = '${{ vars.EMAIL_ENABLED }}'
-          $env:EMAIL_RECIPIENT        = '${{ vars.EMAIL_RECIPIENT }}'
-          $env:EMAIL_CC               = '${{ vars.EMAIL_CC }}'
-          $env:EMAIL_SMTP_HOST        = '${{ vars.EMAIL_SMTP_HOST }}'
-          $env:EMAIL_SMTP_PORT        = '${{ vars.EMAIL_SMTP_PORT }}'
-          $env:EMAIL_SMTP_USER        = '${{ secrets.EMAIL_SMTP_USER }}'
-          $env:EMAIL_SMTP_PASSWORD    = '${{ secrets.EMAIL_SMTP_PASSWORD }}'
-          $env:ANTHROPIC_API_KEY      = '${{ secrets.ANTHROPIC_API_KEY }}'
-          npm run ai-fix
+          ssh -o StrictHostKeyChecking=no \
+              -J diego@${{ vars.TAILSCALE_IP }}:1024 \
+              diego@${{ vars.WINDOWS_VM_IP }} \
+              powershell -NoProfile -NonInteractive << 'EOF'
+          $base    = Join-Path $HOME "artifacts\scraping-api"
+          $logsDir = Join-Path $HOME "logs\scraping-api"
+          $results = Join-Path $HOME "scraping-result"
+
+          New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $results  | Out-Null
+
+          nssm set scraping-api Application    "C:\Program Files\nodejs\node.exe"
+          nssm set scraping-api AppParameters  "$base\dist\main.cjs"
+          nssm set scraping-api AppDirectory   $base
+          nssm set scraping-api AppStdout      "$logsDir\service.log"
+          nssm set scraping-api AppStderr      "$logsDir\service-error.log"
+          nssm set scraping-api AppRotateFiles 1
+          nssm set scraping-api AppRotateSeconds 86400
+          nssm set scraping-api AppRotateBytes   10485760
+          Write-Host "NSSM configured"
+          EOF
+
+      - name: Start service and health check
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -J diego@${{ vars.TAILSCALE_IP }}:1024 \
+              diego@${{ vars.WINDOWS_VM_IP }} \
+              powershell -NoProfile -NonInteractive << 'EOF'
+          sc.exe start scraping-api
+          Start-Sleep -Seconds 10
+
+          $port = "3000"
+          $envFile = Join-Path $HOME "artifacts\scraping-api\.env"
+          if (Test-Path $envFile) {
+            $line = Get-Content $envFile | Where-Object { $_ -match "^PORT=" }
+            if ($line) { $port = ($line -split "=", 2)[1].Trim() }
+          }
+          $url = "http://localhost:$port/health"
+          Write-Host "Health check: $url"
+          for ($i = 1; $i -le 12; $i++) {
+            try {
+              $res = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 5
+              if ($res.StatusCode -eq 200) { Write-Host "Health OK"; exit 0 }
+            } catch { Write-Host "Attempt $i failed: $_" }
+            Start-Sleep -Seconds 5
+          }
+          Write-Host "Health check failed after 60 seconds"
+          exit 1
           EOF
