@@ -22,6 +22,8 @@ Sem autenticação. Retorna:
 ```typescript
 {
   requestId:     string;   // UUID v4
+  routineId:     string;   // UUID v4
+  airline:       string;   // ex: "azul" (único suportado por ora)
   origin:        string;   // IATA 3 chars, ex: "VCP"
   destination:   string;   // IATA 3 chars, ex: "LIS"
   outboundStart: string;   // "YYYY-MM-DD"

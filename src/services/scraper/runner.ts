@@ -9,6 +9,10 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
   logger.info({ requestId: request.requestId, routineId: request.routineId, runDir: run.dir }, 'Scrape job started');
 
   try {
+    if (request.airline !== 'azul') {
+      throw new Error(`Unsupported airline: ${request.airline}`);
+    }
+
     const flights = await searchFlights({
       origin: request.origin,
       destination: request.destination,

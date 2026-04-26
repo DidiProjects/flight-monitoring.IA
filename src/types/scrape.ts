@@ -3,6 +3,7 @@ import type { FlightOffer } from './index.ts';
 export interface ScrapeRequest {
   requestId: string;
   routineId: string;
+  airline: string;
   origin: string;
   destination: string;
   outboundStart: string;
