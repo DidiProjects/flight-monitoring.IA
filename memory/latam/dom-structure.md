@@ -94,9 +94,15 @@ Dispensado automaticamente pelo scraper após cada navegação (no-op se não ap
 <button data-testid="primary-button-button">Fazer login</button>
 ```
 
-## Flight number
+## Flight number (modal de itinerário)
 
-**Não disponível no card visível.** O número real (ex: "LA3455") estaria no modal de detalhes do itinerário (`itinerary-dialog-wrapper`), mas não foi observado.
+Obtido clicando no anchor de paradas e lendo o modal:
 
-**Implementação atual:** número sintético `LA{IATA_ORIGEM}{HHMM}` — ex: "LAGRU1125".
-Serve como chave de deduplicação dentro de uma run. **Não é o número real do voo.**
+```
+Abrir:   [data-testid="itinerary-modal-{i}-details-anchor--link"]
+Número:  [data-testid="incoming-outcoming-title"] [data-testid="airline-wrapper"]
+           → text node após o <span> de imagem, ex: "LA3344"
+Fechar:  [data-testid="itinerary-modal-{i}--dialog-close-button"]   (duplo hífen antes de "dialog")
+```
+
+Para voos com escalas o modal tem múltiplos `incoming-outcoming-title`. Usamos o primeiro (voo da origem).

@@ -297,6 +297,7 @@ type RawCard = {
   durationText: string;
   stopsText: string;
   priceText: string;
+  flightNumber: string;
 };
 
 async function extractCards(
@@ -355,12 +356,42 @@ async function extractCards(
         }
       }
 
-      cards.push({ depTime, depIata, arrTime, arrIata, durationText, stopsText, priceText });
+      cards.push({ depTime, depIata, arrTime, arrIata, durationText, stopsText, priceText, flightNumber: '' });
       i++;
     }
 
     return cards;
   }, redemption);
+
+  // Click each card's itinerary anchor to extract the real flight number from the modal
+  for (let i = 0; i < rawCards.length; i++) {
+    try {
+      const anchor = page.locator(`[data-testid="itinerary-modal-${i}-details-anchor--link"]`);
+      if ((await anchor.count().catch(() => 0)) === 0) continue;
+
+      await anchor.click({ timeout: 3_000 });
+      await humanDelay(400, 700);
+
+      const flightNumber = await page.evaluate((idx) => {
+        const titles = Array.from(document.querySelectorAll('[data-testid="incoming-outcoming-title"]'));
+        if (titles.length === 0) return '';
+        const wrapper = titles[0]!.querySelector('[data-testid="airline-wrapper"]');
+        if (!wrapper) return '';
+        return Array.from(wrapper.childNodes)
+          .filter(n => n.nodeType === 3)
+          .map(n => (n as Text).data.trim())
+          .find(t => t.length > 0) ?? '';
+      }, i).catch(() => '');
+
+      rawCards[i]!.flightNumber = flightNumber;
+
+      const closeBtn = page.locator(`[data-testid="itinerary-modal-${i}--dialog-close-button"]`);
+      await closeBtn.click({ timeout: 3_000 }).catch(() => page.keyboard.press('Escape'));
+      await humanDelay(300, 500);
+    } catch {
+      // Flight number stays empty for this card
+    }
+  }
 
   const offers: FlightOffer[] = [];
 
@@ -370,9 +401,7 @@ async function extractCards(
     const durationMin = parseDurationMin(card.durationText);
     const stops      = parseStops(card.stopsText);
 
-    // Synthetic flight number: LA + departure IATA + HHMM (unique within date+route)
-    const depHHMM    = card.depTime.replace(':', '');
-    const flightNumber = `LA${(card.depIata || origin).toUpperCase()}${depHHMM}`;
+    const flightNumber = card.flightNumber;
 
     const fares: FlightFares = {};
 
