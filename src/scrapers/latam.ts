@@ -247,10 +247,12 @@ async function latamLogin(page: Page, cpf: string, password: string): Promise<bo
     await humanDelay(500, 1_000);
 
     await page.locator('[data-testid="primary-button-button"]').first().click({ timeout: 5_000 });
+    await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
+    await humanDelay(1_500, 2_500);
 
-    // Wait up to 15s for either search results or the 2FA modal
+    // Wait up to 30s for either search results or the 2FA modal
     let outcome: 'cards' | '2fa' | 'timeout' = 'timeout';
-    const deadline = Date.now() + 15_000;
+    const deadline = Date.now() + 30_000;
     while (Date.now() < deadline) {
       const hasCards = await page.locator('[data-testid="wrapper-card-header-0"]').count().then(c => c > 0).catch(() => false);
       if (hasCards) { outcome = 'cards'; break; }
@@ -282,7 +284,7 @@ async function latamLogin(page: Page, cpf: string, password: string): Promise<bo
 
     let code: string | null = null;
     for (let attempt = 0; attempt < 5; attempt++) {
-      await page.waitForTimeout(10_000);
+      await page.waitForTimeout(20_000);
       try {
         const raw = await fs.readFile(path.join(process.cwd(), 'authorization-code.json'), 'utf-8');
         const parsed = JSON.parse(raw) as { code?: unknown };
