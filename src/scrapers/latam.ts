@@ -161,7 +161,7 @@ async function searchDateRange(
         continue;
       }
 
-      const offers = await extractCards(page, origin, destination, date, redemption);
+      const offers = await extractCards(page, origin, destination, date, redemption, params.runDir);
       offers.forEach(o => { o.isReturn = isReturn; });
 
       logger.info({ date, origin, destination, count: offers.length }, 'LATAM date collected');
@@ -268,7 +268,7 @@ async function latamLogin(page: Page, cpf: string, password: string): Promise<bo
 // ── Wait for cards ─────────────────────────────────────────────────────────────
 
 async function waitForCards(page: Page): Promise<boolean> {
-  const deadline = Date.now() + 30_000;
+  const deadline = Date.now() + 90_000;
 
   while (Date.now() < deadline) {
     const hasCard = await page.locator('[data-testid="wrapper-card-header-0"]')
@@ -306,6 +306,7 @@ async function extractCards(
   destination: string,
   date: string,
   redemption: boolean,
+  runDir?: string,
 ): Promise<FlightOffer[]> {
   const rawCards: RawCard[] = await page.evaluate((redemptionMode) => {
     const cards: RawCard[] = [];
@@ -363,34 +364,69 @@ async function extractCards(
     return cards;
   }, redemption);
 
-  // Click each card's itinerary anchor to extract the real flight number from the modal
+  // Click each card's itinerary anchor using native DOM click (bypasses Playwright actionability)
   for (let i = 0; i < rawCards.length; i++) {
-    try {
-      const anchor = page.locator(`[data-testid="itinerary-modal-${i}-details-anchor--link"]`);
-      if ((await anchor.count().catch(() => 0)) === 0) continue;
+    const flightNumber = await page.evaluate(async (cardIndex) => {
+      // Wait for any previous modal to fully close
+      await new Promise<void>((resolve) => {
+        const existingTitle = document.querySelector('[data-testid="incoming-outcoming-title"]');
+        if (!existingTitle || existingTitle.getBoundingClientRect().height === 0) { resolve(); return; }
+        const interval = setInterval(() => {
+          const el = document.querySelector('[data-testid="incoming-outcoming-title"]');
+          if (!el || el.getBoundingClientRect().height === 0) { clearInterval(interval); clearTimeout(bail); resolve(); }
+        }, 100);
+        const bail = setTimeout(() => { clearInterval(interval); resolve(); }, 3_000);
+      });
 
-      await anchor.click({ timeout: 3_000 });
-      await humanDelay(400, 700);
+      const anchor = document.querySelector(`[data-testid="itinerary-modal-${cardIndex}-details-anchor--link"]`);
+      if (!anchor) return '__NO_ANCHOR__';
+      (anchor as HTMLElement).click();
 
-      const flightNumber = await page.evaluate((idx) => {
-        const titles = Array.from(document.querySelectorAll('[data-testid="incoming-outcoming-title"]'));
-        if (titles.length === 0) return '';
-        const wrapper = titles[0]!.querySelector('[data-testid="airline-wrapper"]');
-        if (!wrapper) return '';
-        return Array.from(wrapper.childNodes)
-          .filter(n => n.nodeType === 3)
-          .map(n => (n as Text).data.trim())
-          .find(t => t.length > 0) ?? '';
-      }, i).catch(() => '');
+      // Wait for modal + airline-wrapper to appear
+      await new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          const el = document.querySelector('[data-testid="incoming-outcoming-title"]');
+          if (el && el.getBoundingClientRect().height > 0 && el.querySelector('[data-testid="airline-wrapper"]')) {
+            clearInterval(interval); clearTimeout(bail); resolve();
+          }
+        }, 100);
+        const bail = setTimeout(() => { clearInterval(interval); resolve(); }, 8_000);
+      });
 
-      rawCards[i]!.flightNumber = flightNumber;
+      // Extra wait for React to finish hydrating the correct content
+      await new Promise(r => setTimeout(r, 800));
 
-      const closeBtn = page.locator(`[data-testid="itinerary-modal-${i}--dialog-close-button"]`);
-      await closeBtn.click({ timeout: 3_000 }).catch(() => page.keyboard.press('Escape'));
-      await humanDelay(300, 500);
-    } catch {
-      // Flight number stays empty for this card
+      // Read first incoming-outcoming-title (for connections, the first segment is what we want)
+      const el = document.querySelector('[data-testid="incoming-outcoming-title"]');
+      if (!el) return '__NO_TITLE__';
+      const wrapper = el.querySelector('[data-testid="airline-wrapper"]');
+      if (!wrapper) return '__NO_WRAPPER__';
+      const text = Array.from(wrapper.childNodes)
+        .filter(n => n.nodeType === 3)
+        .map(n => (n as Text).data.trim())
+        .find(t => t.length > 0) ?? '';
+
+      // Close modal
+      const closeBtn =
+        document.querySelector(`[data-testid="itinerary-modal-${cardIndex}--dialog-close-button"]`) ??
+        document.querySelector('[data-testid*="--dialog-close-button"]');
+      if (closeBtn) (closeBtn as HTMLElement).click();
+
+      return text || '__NO_TEXT__';
+    }, i).catch(() => '__EVAL_ERROR__');
+
+    logger.debug({ i, flightNumber }, 'LATAM modal: flight number');
+    rawCards[i]!.flightNumber = flightNumber.startsWith('__') ? '' : flightNumber;
+
+    // Debug: save modal DOM state right after close for first card
+    if (i === 0 && runDir) {
+      const snapDir = path.join(runDir, 'snapshots');
+      await fs.mkdir(snapDir, { recursive: true }).catch(() => {});
+      const modalHtml = await page.evaluate(() => document.documentElement.outerHTML).catch(() => '');
+      await fs.writeFile(path.join(snapDir, `modal-card-0.html`), modalHtml).catch(() => {});
     }
+
+    await humanDelay(300, 500);
   }
 
   const offers: FlightOffer[] = [];

@@ -106,3 +106,11 @@ Fechar:  [data-testid="itinerary-modal-{i}--dialog-close-button"]   (duplo hífe
 ```
 
 Para voos com escalas o modal tem múltiplos `incoming-outcoming-title`. Usamos o primeiro (voo da origem).
+
+### Estado do clique no anchor (2026-04-28)
+**Problema confirmado:** `anchor.click()` dá TimeoutError em todos os cards. O elemento resolve para
+`<a href="" ...>` (anchor sem href, presumivelmente com event listener), mas Playwright não clica.
+**Causa provável:** o anchor está dentro do footer do card que pode estar oculto por CSS (colapsado).
+`page.evaluate` consegue ler textContent de elementos ocultos, mas `locator.click()` exige visibilidade.
+**Fix pendente (não testado):** `anchor.click({ force: true })` no código — precisa ser validado.
+Alternativa: clicar no `[data-testid="wrapper-card-header-{i}"]` primeiro para expandir o card.

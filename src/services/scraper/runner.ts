@@ -17,6 +17,9 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
     await sendResult(result);
   };
 
+  let flights: FlightOffer[] = [];
+  let scraperError: string | undefined;
+
   try {
     const scraperParams = {
       origin:        request.origin,
@@ -29,8 +32,6 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
       runDir:        run.dir,
     };
 
-    let flights: FlightOffer[];
-
     if (request.airline === 'azul') {
       flights = await azulSearch(scraperParams);
     } else if (request.airline === 'latam') {
@@ -40,6 +41,13 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
     }
 
     await saveResults(run, flights);
+  } catch (err) {
+    scraperError = err instanceof Error ? err.message : String(err);
+    await run.saveError(err);
+    logger.error({ requestId: request.requestId, routineId: request.routineId, err }, 'Scrape job failed');
+  }
+
+  try {
     await send({
       requestId:   request.requestId,
       routineId:   request.routineId,
@@ -47,19 +55,10 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
       destination: request.destination,
       flights,
       scrapedAt:   new Date().toISOString(),
+      error:       scraperError,
     });
-  } catch (err) {
-    await run.saveError(err);
-    logger.error({ requestId: request.requestId, routineId: request.routineId, err }, 'Scrape job failed');
-    await send({
-      requestId:   request.requestId,
-      routineId:   request.routineId,
-      origin:      request.origin,
-      destination: request.destination,
-      flights:     [],
-      scrapedAt:   new Date().toISOString(),
-      error:       err instanceof Error ? err.message : String(err),
-    });
+  } catch (sendErr) {
+    logger.warn({ requestId: request.requestId, sendErr }, 'Failed to deliver callback to flight.API');
   } finally {
     await pruneOldRuns();
   }

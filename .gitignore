@@ -1,5 +1,6 @@
 /node_modules
 /dist
+/scraping-result
 .env
 debug-*.png
 .env.example
