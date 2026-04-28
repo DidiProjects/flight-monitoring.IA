@@ -56,7 +56,7 @@ function parseStops(text: string): number {
 
 export async function searchFlights(params: ScraperParams, cpf?: string, password?: string): Promise<FlightOffer[]> {
   const foxOptions = await camoufoxLaunchOptions({
-    headless: true,
+    headless: false,
     os: 'windows',
     locale: 'pt-BR',
     humanize: true,
@@ -247,18 +247,75 @@ async function latamLogin(page: Page, cpf: string, password: string): Promise<bo
     await humanDelay(500, 1_000);
 
     await page.locator('[data-testid="primary-button-button"]').first().click({ timeout: 5_000 });
-    await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
-    await humanDelay(2_000, 3_000);
 
-    // Login succeeded if the CPF input is gone
-    const stillVisible = await cpfInput.isVisible().catch(() => false);
-    if (stillVisible) {
-      logger.warn('LATAM login: CPF input still visible after login attempt');
+    // Wait up to 15s for either search results or the 2FA modal
+    let outcome: 'cards' | '2fa' | 'timeout' = 'timeout';
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      const hasCards = await page.locator('[data-testid="wrapper-card-header-0"]').count().then(c => c > 0).catch(() => false);
+      if (hasCards) { outcome = 'cards'; break; }
+      const has2fa = await page.locator('[data-testid="radio-group-channels-radio-group"]').count().then(c => c > 0).catch(() => false);
+      if (has2fa) { outcome = '2fa'; break; }
+      await page.waitForTimeout(500);
+    }
+
+    if (outcome === 'cards') {
+      logger.info('LATAM login successful');
+      return true;
+    }
+
+    if (outcome === 'timeout') {
+      logger.warn('LATAM login: no cards or 2FA detected within 15s');
       return false;
     }
 
-    logger.info('LATAM login successful');
-    return true;
+    // ── 2FA handling ──────────────────────────────────────────────────────────────
+    logger.info('LATAM 2FA modal detected, selecting email verification');
+
+    await page.locator('[data-testid="radio-EMAIL-radio"]').click({ timeout: 5_000 });
+    await humanDelay(500, 800);
+    await page.locator('[data-testid="form-button--primaryAction-button"]').click({ timeout: 5_000 });
+    await humanDelay(1_000, 2_000);
+
+    await page.locator('[data-testid="form-input--code-0-textfield-input"]').waitFor({ state: 'visible', timeout: 10_000 });
+    logger.info('LATAM 2FA: code input ready — polling authorization-code.json');
+
+    let code: string | null = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await page.waitForTimeout(10_000);
+      try {
+        const raw = await fs.readFile(path.join(process.cwd(), 'authorization-code.json'), 'utf-8');
+        const parsed = JSON.parse(raw) as { code?: unknown };
+        const candidate = String(parsed.code ?? '').replace(/\D/g, '');
+        if (candidate.length === 6) { code = candidate; break; }
+      } catch {
+        logger.debug({ attempt: attempt + 1 }, 'LATAM 2FA: authorization-code.json not ready');
+      }
+    }
+
+    if (!code) {
+      logger.warn('LATAM 2FA: code not obtained after 5 attempts, skipping points');
+      return false;
+    }
+
+    logger.info('LATAM 2FA: code obtained, filling inputs');
+    await page.locator('[data-testid="form-input--code-0-textfield-input"]').click();
+    await page.keyboard.type(code, { delay: 100 + Math.random() * 50 });
+    await humanDelay(500, 800);
+
+    await page.locator('[data-testid="form-button--primaryAction-button"]').click({ timeout: 5_000 });
+
+    const cardsAfter2fa = await page.locator('[data-testid="wrapper-card-header-0"]')
+      .waitFor({ state: 'visible', timeout: 15_000 })
+      .then(() => true).catch(() => false);
+
+    if (cardsAfter2fa) {
+      logger.info('LATAM 2FA login successful');
+      return true;
+    }
+
+    logger.warn('LATAM 2FA: cards did not appear after code submission');
+    return false;
   } catch (err) {
     logger.warn({ err: String(err).slice(0, 120) }, 'LATAM login error');
     return false;
@@ -394,7 +451,7 @@ async function extractCards(
       });
 
       // Extra wait for React to finish hydrating the correct content
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, 3_000));
 
       // Read first incoming-outcoming-title (for connections, the first segment is what we want)
       const el = document.querySelector('[data-testid="incoming-outcoming-title"]');
@@ -476,7 +533,8 @@ function mergePoints(brlOffers: FlightOffer[], ptsOffers: FlightOffer[]): void {
       o.isReturn === pts.isReturn &&
       o.origin.iata === pts.origin.iata &&
       o.destination.iata === pts.destination.iata &&
-      o.origin.timestamp.slice(11, 16) === depTime,
+      o.origin.timestamp.slice(11, 16) === depTime &&
+      (!o.flightNumber || !pts.flightNumber || o.flightNumber === pts.flightNumber),
     );
     if (match) {
       match.fares.points = pts.fares.points;

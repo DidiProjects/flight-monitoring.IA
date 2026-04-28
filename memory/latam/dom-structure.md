@@ -108,9 +108,37 @@ Fechar:  [data-testid="itinerary-modal-{i}--dialog-close-button"]   (duplo hífe
 Para voos com escalas o modal tem múltiplos `incoming-outcoming-title`. Usamos o primeiro (voo da origem).
 
 ### Estado do clique no anchor (2026-04-28)
-**Problema confirmado:** `anchor.click()` dá TimeoutError em todos os cards. O elemento resolve para
-`<a href="" ...>` (anchor sem href, presumivelmente com event listener), mas Playwright não clica.
-**Causa provável:** o anchor está dentro do footer do card que pode estar oculto por CSS (colapsado).
-`page.evaluate` consegue ler textContent de elementos ocultos, mas `locator.click()` exige visibilidade.
-**Fix pendente (não testado):** `anchor.click({ force: true })` no código — precisa ser validado.
-Alternativa: clicar no `[data-testid="wrapper-card-header-{i}"]` primeiro para expandir o card.
+Clique via `page.evaluate` + `.click()` nativo funcionando. Playwright locator dava TimeoutError (elemento estava dentro de footer colapsado). Solução definitiva: usar DOM nativo dentro de `page.evaluate`.
+
+## Login 2FA (verificação de novo navegador)
+
+Após inserir CPF + senha, pode aparecer um modal solicitando código de verificação por WhatsApp/Email/SMS.
+
+### Detecção
+```
+[data-testid="radio-group-channels-radio-group"]  → modal de 2FA presente
+[data-testid="wrapper-card-header-0"]             → passagens carregaram (login OK)
+```
+Aguardar 15s por qualquer um dos dois após clicar em login.
+
+### Fluxo 2FA
+```
+1. Clicar radio Email:   [data-testid="radio-EMAIL-radio"]
+2. Clicar Enviar código: [data-testid="form-button--primaryAction-button"]
+3. Aguardar campo:       [data-testid="form-input--code-0-textfield-input"]
+4. Ler código de:        {process.cwd()}/authorization-code.json  → { "code": 123456 }
+   - 5 tentativas × 10s cada
+   - Se não obtiver: abandona busca de pontos
+5. Clicar no campo code-0 e digitar os 6 dígitos via keyboard.type
+6. Clicar Enviar código: [data-testid="form-button--primaryAction-button"]
+7. Aguardar 15s por [data-testid="wrapper-card-header-0"]
+```
+
+### Campos do código (6 dígitos separados)
+```
+[data-testid="form-input--code-0-textfield-input"]  ← clicar aqui e digitar sequencialmente
+[data-testid="form-input--code-1-textfield-input"]
+...
+[data-testid="form-input--code-5-textfield-input"]
+```
+O foco avança automaticamente entre campos ao digitar — basta clicar no primeiro e usar `keyboard.type`.

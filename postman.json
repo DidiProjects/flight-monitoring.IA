@@ -1,0 +1,64 @@
+{
+  "info": {
+    "name": "scraping.API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000" },
+    { "key": "api_key",  "value": "local-test-key" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/health"
+      }
+    },
+    {
+      "name": "Scrape LATAM — só ida",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/scrape",
+        "header": [
+          { "key": "X-API-Key",     "value": "{{api_key}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"requestId\": \"00000000-0000-0000-0000-000000000001\",\n  \"routineId\": \"00000000-0000-0000-0000-000000000002\",\n  \"airline\": \"latam\",\n  \"origin\": \"GRU\",\n  \"destination\": \"CNF\",\n  \"outboundStart\": \"2026-05-30\",\n  \"outboundEnd\": \"2026-05-30\",\n  \"passengers\": 1\n}"
+        }
+      }
+    },
+    {
+      "name": "Scrape LATAM — ida e volta",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/scrape",
+        "header": [
+          { "key": "X-API-Key",     "value": "{{api_key}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"requestId\": \"00000000-0000-0000-0000-000000000003\",\n  \"routineId\": \"00000000-0000-0000-0000-000000000002\",\n  \"airline\": \"latam\",\n  \"origin\": \"GRU\",\n  \"destination\": \"CNF\",\n  \"outboundStart\": \"2026-05-30\",\n  \"outboundEnd\": \"2026-05-30\",\n  \"returnStart\": \"2026-06-05\",\n  \"returnEnd\": \"2026-06-05\",\n  \"passengers\": 1\n}"
+        }
+      }
+    },
+    {
+      "name": "Scrape Azul — só ida",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/scrape",
+        "header": [
+          { "key": "X-API-Key",     "value": "{{api_key}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"requestId\": \"00000000-0000-0000-0000-000000000004\",\n  \"routineId\": \"00000000-0000-0000-0000-000000000002\",\n  \"airline\": \"azul\",\n  \"origin\": \"VCP\",\n  \"destination\": \"LIS\",\n  \"outboundStart\": \"2026-05-30\",\n  \"outboundEnd\": \"2026-05-30\",\n  \"passengers\": 1\n}"
+        }
+      }
+    }
+  ]
+}
