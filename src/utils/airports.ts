@@ -24,5 +24,7 @@ export const AIRPORT_TZ: Record<string, string> = {
 
 export function toTimestamp(date: string, time: string, iata: string): string {
   const tz = AIRPORT_TZ[iata] ?? '+00:00';
-  return `${date}T${time}:00${tz}`;
+  const [h, m] = time.split(':');
+  const padded = `${(h ?? '0').padStart(2, '0')}:${m ?? '00'}`;
+  return `${date}T${padded}:00${tz}`;
 }
