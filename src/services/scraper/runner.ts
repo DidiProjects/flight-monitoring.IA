@@ -36,7 +36,7 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
     if (airline === 'azul') {
       flights = await azulSearch(scraperParams);
     } else if (airline === 'latam') {
-      flights = await latamSearch(scraperParams, env.LATAM_CPF, env.LATAM_PASSWORD);
+      flights = await latamSearch(scraperParams);
     } else {
       throw new Error(`Unsupported airline: ${request.airline}`);
     }

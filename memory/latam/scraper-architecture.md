@@ -57,19 +57,30 @@ Fluxo em `extractCards`:
 (swallowed pelo try/catch do loop), impedindo o close button de ser clicado.
 **Fix:** `extractCards` agora recebe `runDir?: string` como último parâmetro. Call site passa `params.runDir`.
 
-### Bug #2 — em investigação (2026-04-28)
-`anchor.click()` dá `TimeoutError: Timeout 5000ms exceeded` em todos os cards.
-O anchor existe no DOM (`count() > 0`), resolve para `<a href="" ...>`, mas Playwright não consegue clicar.
-**Hipótese:** o footer do card está oculto via CSS (card colapsado). `page.evaluate` lê `textContent` de
-elementos ocultos sem problema, mas `click()` do Playwright exige visibilidade.
-**Fix pendente (não testado):** `anchor.click({ force: true })` + `scrollIntoViewIfNeeded` já está no código.
-Próximo passo: confirmar se `force: true` resolve, ou se é preciso clicar no header do card antes.
+### Bug #2 — CORRIGIDO (2026-04-29)
+`anchor.click()` dava `TimeoutError` porque o anchor estava dentro do footer colapsado.
+**Fix:** usar `page.evaluate` com `.click()` nativo do DOM (bypassa actionability check do Playwright).
+Flightumbers agora coletados corretamente: LA3554, LA3556, etc.
 
-## Resultados confirmados (testes locais 2026-04-27/28)
+### Bug #3 — CORRIGIDO (2026-04-29) — timestamp sem zero-padding
+`toTimestamp()` em `src/utils/airports.ts` não zero-padava a hora.
+Código antigo: `return \`${date}T${time}:00${tz}\`` → com `time="8:00"` produzia `"2026-05-30T8:00:00-03:00"`
+O `slice(11, 16)` desse timestamp retornava `"8:00:"` (5 chars, com colon do segundo incluído).
+O flight.API recebia `departureTime = "8:00:"` e construía `"2026-05-30T8:00::00"` → erro no Postgres.
+**Fix (ec25e1e + complemento):**
+```typescript
+const [h, m] = time.split(':');
+const padded = `${(h ?? '0').padStart(2, '0')}:${(m ?? '00').padStart(2, '0')}`;
+return `${date}T${padded}:00${tz}`;
+```
+Horas E minutos agora zero-padados. Confirmado localmente: 39 voos, todos com timestamps corretos.
 
-- GRU→CNF, 2026-05-30, BRL: 29–39 voos extraídos (varia por tentativa — LATAM às vezes retorna menos)
-- IATA corretos, timestamps com timezone -03:00, durationMin, stops, fares.brl — tudo OK
-- flightNumber: sempre vazio (Bug #2 bloqueando o modal click)
+## Resultados confirmados (testes locais 2026-04-29)
+
+- GRU→CNF, 2026-05-30, BRL: **39 voos** extraídos
+- IATA corretos, timestamps `HH:mm` zero-padados, durationMin, stops, fares.brl — tudo OK
+- flightNumbers todos coletados via modal (LA3554, LA3556, etc.)
+- Busca de pontos desativada temporariamente (só BRL por enquanto)
 
 ## Comportamento do `waitForCards`
 
