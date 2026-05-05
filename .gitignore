@@ -1,7 +1,9 @@
 /node_modules
 /dist
+/scraping-result
 .env
 debug-*.png
+authorization-code*.json
 .env.example
 /results/**
 !/results/**/state.json

@@ -12,6 +12,8 @@ const schema = z.object({
   LOG_LEVEL:          z.string().default('info'),
   LOG_PRETTY:         z.string().default('false'),
   NODE_ENV:           z.string().default('development'),
+  LATAM_CPF:          z.string().optional(),
+  LATAM_PASSWORD:     z.string().optional(),
 });
 
 export const env = schema.parse(process.env);

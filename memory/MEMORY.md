@@ -16,3 +16,7 @@
 ## Azul (voeazul.com.br)
 - [Arquitetura do scraper](azul/scraper-architecture.md), stack, ordem exata do fluxo, arquitetura de buscas, coleta de dados, estado atual do código
 - [Seletores DOM confirmados](azul/dom-structure.md), HTML real de cada elemento interativo, campo datas DDMMYYYY, booking-calendar, botões moeda, tsx/esbuild __name warning
+
+## LATAM (latamairlines.com)
+- [Arquitetura do scraper](latam/scraper-architecture.md), fluxo BRL + pontos, login, limitações (flight number sintético, sem híbrido)
+- [Seletores DOM confirmados](latam/dom-structure.md), data-testid dos cards, login, preços BRL e milhas

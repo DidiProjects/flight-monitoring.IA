@@ -30,7 +30,10 @@
       "Read(//c/Users/Diego/.local/share/**)",
       "Bash(find /root -name \"camoufox*\" -maxdepth 6)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(curl -s http://localhost:3000/health)",
+      "Bash(curl -s -X POST http://localhost:3000/scrape -H 'X-API-Key: local-test-key' -H 'Content-Type: application/json' -d '{ *)",
+      "Read(//tmp/**)"
     ]
   }
 }

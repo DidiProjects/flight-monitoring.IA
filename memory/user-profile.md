@@ -10,3 +10,5 @@ Comunicação em português brasileiro. Respostas curtas e diretas, não precisa
 Trabalha de forma iterativa: roda, analisa o output/snapshots, pede ajustes. Não precisa de confirmação a cada passo, quer que o Claude tome decisões e execute.
 
 Usa o README.md como canal para passar instruções técnicas ao Claude (ex: estrutura DOM, fluxos de interação).
+
+Prefere usar Claude Code pelo terminal (`claude --dangerously-skip-permissions`) para evitar prompts de aprovação de ferramentas. O VSCode extension pede confirmação com mais frequência e interrompe o fluxo.
