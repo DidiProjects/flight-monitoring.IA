@@ -46,6 +46,31 @@ const AIRPORT_TZ: Record<string, string> = {
   HEL: 'Europe/Helsinki',     OSL: 'Europe/Oslo',
   CPH: 'Europe/Copenhagen',   ARN: 'Europe/Stockholm',
   ATH: 'Europe/Athens',       IST: 'Europe/Istanbul',
+  // Italy (Ryanair hubs)
+  NAP: 'Europe/Rome',  BGY: 'Europe/Rome',  CIA: 'Europe/Rome',
+  PSA: 'Europe/Rome',  PMO: 'Europe/Rome',  BRI: 'Europe/Rome',
+  CAG: 'Europe/Rome',  CTA: 'Europe/Rome',
+  // Spain extra (Ryanair)
+  AGP: 'Europe/Madrid', ALC: 'Europe/Madrid', PMI: 'Europe/Madrid',
+  IBZ: 'Europe/Madrid', VLC: 'Europe/Madrid', SVQ: 'Europe/Madrid',
+  GRX: 'Europe/Madrid', SDR: 'Europe/Madrid', FUE: 'Atlantic/Canary',
+  ACE: 'Atlantic/Canary', TFS: 'Atlantic/Canary', TFN: 'Atlantic/Canary',
+  LPA: 'Atlantic/Canary', SPC: 'Atlantic/Canary',
+  // France extra
+  MRS: 'Europe/Paris', NCE: 'Europe/Paris', LYS: 'Europe/Paris',
+  TLS: 'Europe/Paris', NTE: 'Europe/Paris', BOD: 'Europe/Paris',
+  // UK extra (Ryanair)
+  STN: 'Europe/London', EMA: 'Europe/London', BRS: 'Europe/London',
+  // Belgium / Netherlands
+  CRL: 'Europe/Brussels', BRU: 'Europe/Brussels',
+  // Poland (Ryanair strong)
+  GDN: 'Europe/Warsaw', WRO: 'Europe/Warsaw', KTW: 'Europe/Warsaw',
+  // Greece extra
+  SKG: 'Europe/Athens', HER: 'Europe/Athens', RHO: 'Europe/Athens',
+  CFU: 'Europe/Athens', JTR: 'Europe/Athens', KGS: 'Europe/Athens',
+  // Eastern Europe
+  BEG: 'Europe/Belgrade', OTP: 'Europe/Bucharest', BTS: 'Europe/Bratislava',
+  KBP: 'Europe/Kyiv',     SOF: 'Europe/Sofia',
   // USA East
   MIA: 'America/New_York', JFK: 'America/New_York', MCO: 'America/New_York',
   FLL: 'America/New_York', EWR: 'America/New_York', BOS: 'America/New_York',

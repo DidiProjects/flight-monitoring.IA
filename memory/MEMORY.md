@@ -21,6 +21,10 @@
 - [Arquitetura do scraper](latam/scraper-architecture.md), fluxo BRL + pontos, login, limitações (flight number sintético, sem híbrido)
 - [Seletores DOM confirmados](latam/dom-structure.md), data-testid dos cards, login, preços BRL e milhas
 
+## Ryanair (ryanair.com)
+- [Arquitetura do scraper](ryanair/scraper-architecture.md), Angular SPA, EUR, data-ref para IATA e flight number, stops=0 fixo, airline key="ryanair"
+- [Seletores DOM confirmados](ryanair/dom-structure.md), data-ref="flight-card_all_information", IATA embutido no atributo data-ref, data-e2e="flight-card-price"
+
 ## British Airways (britishairways.com)
 - [Arquitetura do scraper](ba/scraper-architecture.md), URL direto sem formulário, só cash GBP, múltiplos cards por voo (fare tiers), airline key="britishairways"
 - [Seletores DOM confirmados](ba/dom-structure.md), data-ds-cr-name Card, testid com sufixo $=, "connection" não "stop", agreement-type no DOM colapsado
