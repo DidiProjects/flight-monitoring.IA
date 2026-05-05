@@ -20,3 +20,7 @@
 ## LATAM (latamairlines.com)
 - [Arquitetura do scraper](latam/scraper-architecture.md), fluxo BRL + pontos, login, limitações (flight number sintético, sem híbrido)
 - [Seletores DOM confirmados](latam/dom-structure.md), data-testid dos cards, login, preços BRL e milhas
+
+## British Airways (britishairways.com)
+- [Arquitetura do scraper](ba/scraper-architecture.md), URL direto sem formulário, só cash GBP, múltiplos cards por voo (fare tiers), airline key="britishairways"
+- [Seletores DOM confirmados](ba/dom-structure.md), data-ds-cr-name Card, testid com sufixo $=, "connection" não "stop", agreement-type no DOM colapsado

@@ -1,5 +1,6 @@
 import { searchFlights as azulSearch } from '../../scrapers/azul.ts';
 import { searchFlights as latamSearch } from '../../scrapers/latam.ts';
+import { searchFlights as baSearch } from '../../scrapers/britishairways.ts';
 import { buildCallbackPayload, sendResult } from '../result/sender.ts';
 import { createRun, saveResults, saveResponse, pruneOldRuns } from '../../utils/runs.ts';
 import { logger } from '../../utils/logger.ts';
@@ -37,6 +38,8 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
       flights = await azulSearch(scraperParams);
     } else if (airline === 'latam') {
       flights = await latamSearch(scraperParams);
+    } else if (airline === 'britishairways') {
+      flights = await baSearch(scraperParams);
     } else {
       throw new Error(`Unsupported airline: ${request.airline}`);
     }
