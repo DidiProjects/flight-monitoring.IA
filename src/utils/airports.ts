@@ -18,6 +18,34 @@ const AIRPORT_TZ: Record<string, string> = {
   FRA: 'Europe/Berlin',      ZRH: 'Europe/Zurich',
   // UK
   LHR: 'Europe/London', LGW: 'Europe/London', MAN: 'Europe/London',
+  LON: 'Europe/London', EDI: 'Europe/London', BHX: 'Europe/London', LCY: 'Europe/London',
+  // Middle East / Asia
+  DXB: 'Asia/Dubai',          AUH: 'Asia/Dubai',
+  DOH: 'Asia/Qatar',
+  BKK: 'Asia/Bangkok',        DMK: 'Asia/Bangkok',
+  SIN: 'Asia/Singapore',
+  HKG: 'Asia/Hong_Kong',
+  NRT: 'Asia/Tokyo',          HND: 'Asia/Tokyo',
+  ICN: 'Asia/Seoul',
+  KUL: 'Asia/Kuala_Lumpur',
+  // Africa
+  JNB: 'Africa/Johannesburg', CPT: 'Africa/Johannesburg',
+  NBO: 'Africa/Nairobi',      ADD: 'Africa/Addis_Ababa',
+  CAI: 'Africa/Cairo',        CMN: 'Africa/Casablanca',
+  // Oceania
+  SYD: 'Australia/Sydney',    MEL: 'Australia/Melbourne',
+  // North America additions
+  ORD: 'America/Chicago',     DFW: 'America/Chicago',
+  DEN: 'America/Denver',      PHX: 'America/Phoenix',
+  SEA: 'America/Los_Angeles', LAS: 'America/Los_Angeles',
+  YYZ: 'America/Toronto',     YVR: 'America/Vancouver',
+  // Europe additions
+  DUB: 'Europe/Dublin',       GVA: 'Europe/Zurich',
+  VIE: 'Europe/Vienna',       PRG: 'Europe/Prague',
+  WAW: 'Europe/Warsaw',       BUD: 'Europe/Budapest',
+  HEL: 'Europe/Helsinki',     OSL: 'Europe/Oslo',
+  CPH: 'Europe/Copenhagen',   ARN: 'Europe/Stockholm',
+  ATH: 'Europe/Athens',       IST: 'Europe/Istanbul',
   // USA East
   MIA: 'America/New_York', JFK: 'America/New_York', MCO: 'America/New_York',
   FLL: 'America/New_York', EWR: 'America/New_York', BOS: 'America/New_York',
