@@ -61,10 +61,10 @@ Body (campos flat, mapeados de FlightOffer):
     arrivalTime:   string;          // "HH:mm"
     durationMin:   number;
     stops:         number;
-    fareBrl:       number | null;
+    fareCash:       number | null;
     farePts:       number | null;
     fareHybPts:    number | null;
-    fareHybBrl:    number | null;
+    fareHybCash:    number | null;
   }[];
   scrapedAt:   string;   // ISO 8601
   error?:      string;   // presente apenas em falha

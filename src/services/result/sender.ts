@@ -15,10 +15,10 @@ function toCallbackOffer(offer: FlightOffer) {
     arrivalTime:   offer.destination.timestamp.slice(11, 16),
     durationMin:   offer.durationMin,
     stops:         offer.stops,
-    fareBrl:       offer.fares.brl?.amount    ?? null,
+    fareCash:       offer.fares.brl?.amount    ?? null,
     farePts:       offer.fares.points?.amount ?? null,
     fareHybPts:    offer.fares.hybrid?.points ?? null,
-    fareHybBrl:    offer.fares.hybrid?.cash   ?? null,
+    fareHybCash:    offer.fares.hybrid?.cash   ?? null,
   };
 }
 
