@@ -51,7 +51,7 @@ created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 
 ### `airlines`
 ```sql
-code   VARCHAR(10) PRIMARY KEY  -- 'azul'
+code   VARCHAR(20) PRIMARY KEY  -- 'azul'
 name   VARCHAR(100) NOT NULL    -- 'Azul Linhas Aéreas'
 active BOOLEAN NOT NULL DEFAULT true
 ```
@@ -62,7 +62,7 @@ Seed inicial: `('azul', 'Azul Linhas Aéreas', true)`.
 id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
 user_id         UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE
 name            VARCHAR(100) NOT NULL
-airline         VARCHAR(10)  NOT NULL REFERENCES airlines(code)
+airline         VARCHAR(20)  NOT NULL REFERENCES airlines(code)
 origin          CHAR(3)      NOT NULL  -- IATA
 destination     CHAR(3)      NOT NULL  -- IATA
 outbound_start  DATE         NOT NULL
@@ -115,8 +115,8 @@ Ao desinscrever um CC via token: atualiza o objeto correspondente para `subscrib
 ```sql
 id                    UUID PRIMARY KEY DEFAULT gen_random_uuid()
 routine_id            UUID        NOT NULL REFERENCES routines(id) ON DELETE CASCADE
-airline               VARCHAR(10) NOT NULL
-flight_number         VARCHAR(10) NOT NULL
+airline               VARCHAR(20) NOT NULL
+flight_number         VARCHAR(20) NOT NULL
 date                  DATE        NOT NULL
 is_return             BOOLEAN     NOT NULL DEFAULT false
 origin_iata           CHAR(3)     NOT NULL
