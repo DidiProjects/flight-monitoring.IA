@@ -48,6 +48,14 @@ function parseGBP(text: string): number | null {
   return isNaN(val) ? null : val;
 }
 
+// "R$3,280" → 3280  (old UI — BRL prices)
+function parseBRL(text: string): number | null {
+  const m = text.match(/R\$([\d,]+)/);
+  if (!m) return null;
+  const val = parseFloat(m[1]!.replace(/,/g, ''));
+  return isNaN(val) ? null : val;
+}
+
 // "British Airways • BA 247 • AIRBUS A350-1000" → "BA247"
 function parseFlightNumber(text: string): string {
   const m = text.match(/•\s*([A-Z]{2}\s*\d+)\s*•/);
@@ -55,11 +63,25 @@ function parseFlightNumber(text: string): string {
   return m[1]!.replace(/\s+/g, '');
 }
 
-// "Direct" → 0, "1 stop" → 1, "1 connection" → 1
+// "Aircraft: BA0246 (Airbus A350 jet)" → "BA246"  (old UI — leading zeros stripped)
+// "Aircraft: G31376 (Boeing 737 jet)" → "G31376" (GOL: IATA code G3 + flight 1376)
+function parseFlightNumberOld(text: string): string {
+  const m = text.match(/\b([A-Z][A-Z0-9])0*(\d+)/);
+  return m ? m[1]! + m[2]! : '';
+}
+
+// "Direct" → 0, "1 stop" → 1, "1 connection" → 1, "Non-stop" → 0
 function parseStops(text: string): number {
-  if (/direct/i.test(text)) return 0;
+  if (/direct|non.?stop/i.test(text)) return 0;
   const m = text.match(/(\d+)\s*(stop|connection)/i);
   return m ? parseInt(m[1]!) : 0;
+}
+
+// "11h  hours20m minutes" → 680  (old UI duration textContent)
+function parseDurationMinOld(text: string): number {
+  const h = text.match(/(\d+)\s*h/)?.[1];
+  const m = text.match(/(\d+)\s*m/)?.[1];
+  return (h ? parseInt(h) * 60 : 0) + (m ? parseInt(m) : 0);
 }
 
 // ── Main entry ──────────────────────────────────────────────────────────────────
@@ -190,12 +212,17 @@ async function waitForCards(page: Page): Promise<boolean> {
   const deadline = Date.now() + 60_000;
 
   while (Date.now() < deadline) {
-    const hasCard = await page.locator('[data-ds-cr-name="Card"]')
+    const hasNewCard = await page.locator('[data-ds-cr-name="Card"]')
       .count().then(c => c > 0).catch(() => false);
-    if (hasCard) return true;
+    if (hasNewCard) return true;
+
+    // Old BA UI (served when origin is outside UK — BRL prices, .flight-option cards)
+    const hasOldCard = await page.locator('.flight-option')
+      .count().then(c => c > 0).catch(() => false);
+    if (hasOldCard) return true;
 
     const noFlights = await page.evaluate(() =>
-      /no flights|no results|unavailable|0 flights/i.test(document.body.innerText),
+      /no flights|no results|0 flights/i.test(document.body.innerText),
     ).catch(() => false);
     if (noFlights) return false;
 
@@ -219,12 +246,46 @@ type RawCard = {
   agreementText: string;
 };
 
+type RawCardOld = {
+  depTime: string;
+  depIata: string;
+  arrTime: string;
+  arrIata: string;
+  stopsText: string;
+  durationText: string;
+  priceText: string;
+  aircraftText: string;
+};
+
 async function extractCards(
   page: Page,
   origin: string,
   destination: string,
   date: string,
   runDir?: string,
+): Promise<FlightOffer[]> {
+  const isNewUI = await page.locator('[data-ds-cr-name="Card"]').count()
+    .then(c => c > 0).catch(() => false);
+
+  const offers = isNewUI
+    ? await extractCardsNewUI(page, origin, destination, date)
+    : await extractCardsOldUI(page, origin, destination, date);
+
+  if (runDir) {
+    const snapDir = path.join(runDir, 'snapshots');
+    await fs.mkdir(snapDir, { recursive: true }).catch(() => {});
+    const html = await page.evaluate(() => document.documentElement.outerHTML).catch(() => '');
+    await fs.writeFile(path.join(snapDir, `ba-${origin}-${destination}-${date}-extracted.html`), html).catch(() => {});
+  }
+
+  return offers;
+}
+
+async function extractCardsNewUI(
+  page: Page,
+  origin: string,
+  destination: string,
+  date: string,
 ): Promise<FlightOffer[]> {
   const rawCards: RawCard[] = await page.evaluate(() => {
     const cards = Array.from(document.querySelectorAll('[data-ds-cr-name="Card"]'));
@@ -262,9 +323,7 @@ async function extractCards(
     const priceGBP = parseGBP(card.priceText);
     if (priceGBP === null || priceGBP <= 0) continue;
 
-    const fares: FlightFares = {
-      brl: { amount: priceGBP, currency: 'GBP' },
-    };
+    const fares: FlightFares = { brl: { amount: priceGBP, currency: 'GBP' } };
 
     offers.push({
       date,
@@ -284,11 +343,87 @@ async function extractCards(
     });
   }
 
-  if (runDir) {
-    const snapDir = path.join(runDir, 'snapshots');
-    await fs.mkdir(snapDir, { recursive: true }).catch(() => {});
-    const html = await page.evaluate(() => document.documentElement.outerHTML).catch(() => '');
-    await fs.writeFile(path.join(snapDir, `ba-${origin}-${destination}-${date}-extracted.html`), html).catch(() => {});
+  return offers;
+}
+
+async function extractCardsOldUI(
+  page: Page,
+  origin: string,
+  destination: string,
+  date: string,
+): Promise<FlightOffer[]> {
+  const rawCards: RawCardOld[] = await page.evaluate(() => {
+    const options = Array.from(document.querySelectorAll('.flight-option'));
+    const results: RawCardOld[] = [];
+
+    for (const opt of options) {
+      const originRaw = opt.querySelector('[data-cy="flight-origin-details"]')?.textContent ?? '';
+      const destRaw = opt.querySelector('[data-cy="flight-destination-details"]')?.textContent ?? '';
+
+      // " 16:25 GRU " → ["16:25", "GRU"]
+      const originParts = originRaw.trim().replace(/ /g, ' ').split(/\s+/);
+      const destParts = destRaw.trim().replace(/ /g, ' ').split(/\s+/);
+
+      const depTime = originParts[0] ?? '';
+      const depIata = originParts[1] ?? '';
+      const arrTime = destParts[0] ?? '';
+      const arrIata = destParts[1] ?? '';
+
+      const stopsText = opt.querySelector('.stops-and-connections')?.textContent?.trim() ?? '';
+      const durationText = opt.querySelector('.duration-summary')?.textContent ?? '';
+
+      // First Economy cabin button
+      let priceText = '';
+      const cabinNames = Array.from(opt.querySelectorAll('.cabin-name'));
+      for (const cn of cabinNames) {
+        if (/economy/i.test(cn.textContent ?? '')) {
+          const wrapper = cn.closest('.flight-list-button-wrapper');
+          priceText = wrapper?.querySelector('.small-price')?.textContent ?? '';
+          break;
+        }
+      }
+
+      // First Aircraft paragraph (first leg flight number)
+      let aircraftText = '';
+      const paras = Array.from(opt.querySelectorAll('p'));
+      for (const p of paras) {
+        if (/Aircraft/i.test(p.textContent ?? '')) {
+          aircraftText = p.textContent ?? '';
+          break;
+        }
+      }
+
+      if (!depTime || !arrTime) continue;
+      results.push({ depTime, depIata, arrTime, arrIata, stopsText, durationText, priceText, aircraftText });
+    }
+
+    return results;
+  });
+
+  const offers: FlightOffer[] = [];
+
+  for (const card of rawCards) {
+    const priceBRL = parseBRL(card.priceText);
+    if (priceBRL === null || priceBRL <= 0) continue;
+
+    const fares: FlightFares = { brl: { amount: priceBRL, currency: 'BRL' } };
+
+    offers.push({
+      date,
+      flightNumber: parseFlightNumberOld(card.aircraftText),
+      origin: {
+        iata: card.depIata || origin,
+        timestamp: toTimestamp(date, card.depTime, card.depIata || origin),
+      },
+      destination: {
+        iata: card.arrIata || destination,
+        timestamp: toTimestamp(date, card.arrTime, card.arrIata || destination),
+      },
+      durationMin: parseDurationMinOld(card.durationText),
+      stops: parseStops(card.stopsText),
+      fares,
+      isReturn: false,
+    });
   }
 
   return offers;

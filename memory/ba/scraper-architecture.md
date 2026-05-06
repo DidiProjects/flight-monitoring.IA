@@ -19,7 +19,17 @@ https://www.britishairways.com/nx/b/airselect/en/gbr/book/search/?trip=oneWay&de
 - `from`/`to` aceitam tanto código de cidade (LON) quanto IATA de aeroporto (LHR)
 - A página carrega os resultados diretamente da URL, sem interação de formulário
 - Sem autenticação / login necessário
-- Apenas cash (GBP) — sem pontos/milhas
+
+## Duas UIs distintas (comportamento confirmado 2026-05-06)
+
+BA serve UIs diferentes dependendo do aeroporto de ORIGEM:
+
+| Origem       | UI        | Moeda | Seletor de card           |
+|--------------|-----------|-------|---------------------------|
+| UK (LON/LHR) | Nova (Angular DS) | GBP £ | `[data-ds-cr-name="Card"]` |
+| BR (GRU/CGH) | Velha (Angular)   | BRL R$ | `.flight-option`           |
+
+O scraper detecta automaticamente qual UI está ativa via `waitForCards` + `extractCards`.
 
 ## Airline key no runner
 
@@ -45,23 +55,28 @@ Para cada data no range, navega para a URL e coleta todos os cards da página.
 ## Coleta de dados
 
 Estratégia: `page.evaluate` em uma única passagem. Os dados de número de voo estão no DOM
-mesmo com o accordion colapsado (`aria-hidden="true"`, mas conteúdo presente no HTML).
+mesmo com o accordion/modal colapsado, conteúdo presente no HTML.
 Não é necessário clicar em nada (diferente da LATAM que precisa abrir modal).
 
-## Múltiplos cards por voo (comportamento observado 2026-05-05)
+## Múltiplos cards por voo (nova UI)
 
 BA exibe o mesmo voo de conexão como múltiplos cards com preços distintos (tarifas diferentes
 dentro da mesma classe, ex: Economy Saver £670 e Economy Flex £871). Cada card = uma oferta.
 Voos diretos aparecem uma única vez. Isso é comportamento correto do site, não bug.
 
-## Resultados confirmados (teste local 2026-05-05)
+## Resultados confirmados (2026-05-06)
 
-- LON→GRU, 2026-12-27: 15 voos extraídos
-- 1 voo direto (BA247, £642), 14 com conexão
-- flightNumbers corretos (BA247, IB1864, IB726, BA458, BA3270, BA7065, IB724, BA249, BA7061)
-- Airports: LHR, LGW, LCY (todos Europe/London, timezone OK)
-- stops: 0 para diretos, 1 para conexões (texto "1 connection" no DOM)
-- GBP amount correto, currency: 'GBP'
+### LON→GRU (nova UI, GBP)
+- 17 datas (04–20 dez/26): 255 voos extraídos (~15/data)
+- flightNumbers: BA247, IB1864, IB726, BA458, etc.
+- currency: 'GBP'
+
+### GRU→LON (velha UI, BRL)
+- 3 datas (19–21 fev/27): 60 voos extraídos (20/data)
+- BA246 direto GRU→LHR, 11h20min, R$3,280
+- IB268 conexão via MAD, 14h15m, R$3,127
+- currency: 'BRL'
+- Codeshares GOL (G3) também aparecem — IATA code `G3` é alfanumérico
 
 ## Dev local
 
