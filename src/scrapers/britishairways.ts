@@ -131,6 +131,7 @@ async function searchDateRange(
       await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
       await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
       await humanDelay(1_500, 2_500);
+      await dismissCookieBanner(page);
 
       const hasCards = await waitForCards(page);
       await saveSnapshot(page, params.runDir, `ba-${origin}-${destination}-${date}`);
@@ -170,6 +171,17 @@ async function searchDateRange(
   }
 
   return allOffers;
+}
+
+// ── Cookie banner ───────────────────────────────────────────────────────────────
+
+async function dismissCookieBanner(page: Page): Promise<void> {
+  const btn = page.locator('#onetrust-accept-btn-handler');
+  const visible = await btn.isVisible().catch(() => false);
+  if (!visible) return;
+  await btn.click();
+  await page.locator('#onetrust-banner-sdk').waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
+  logger.debug('BA cookie banner dismissed');
 }
 
 // ── Wait for cards ──────────────────────────────────────────────────────────────
