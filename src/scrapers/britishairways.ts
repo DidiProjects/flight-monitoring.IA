@@ -323,7 +323,7 @@ async function extractCardsNewUI(
     const priceGBP = parseGBP(card.priceText);
     if (priceGBP === null || priceGBP <= 0) continue;
 
-    const fares: FlightFares = { brl: { amount: priceGBP, currency: 'GBP' } };
+    const fares: FlightFares = { cash: { amount: priceGBP, currency: 'GBP' } };
 
     offers.push({
       date,
@@ -406,7 +406,7 @@ async function extractCardsOldUI(
     const priceBRL = parseBRL(card.priceText);
     if (priceBRL === null || priceBRL <= 0) continue;
 
-    const fares: FlightFares = { brl: { amount: priceBRL, currency: 'BRL' } };
+    const fares: FlightFares = { cash: { amount: priceBRL, currency: 'BRL' } };
 
     offers.push({
       date,

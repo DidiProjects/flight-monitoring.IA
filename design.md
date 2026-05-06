@@ -258,7 +258,7 @@ Usuários com `must_change_password = true` só acessam `/auth/change-password` 
   "targetHybPts": 18000,
   "targetHybBrl": 1500,
   "margin": 0.1,
-  "priority": "brl",
+  "priority": "cash",
   "notificationMode": "daily_best_and_alert",
   "notificationFrequency": "daily",
   "endOfPeriodTime": null,

@@ -78,7 +78,7 @@ Horas E minutos agora zero-padados. Confirmado localmente: 39 voos, todos com ti
 ## Resultados confirmados (testes locais 2026-04-29)
 
 - GRU→CNF, 2026-05-30, BRL: **39 voos** extraídos
-- IATA corretos, timestamps `HH:mm` zero-padados, durationMin, stops, fares.brl — tudo OK
+- IATA corretos, timestamps `HH:mm` zero-padados, durationMin, stops, fares.cash — tudo OK
 - flightNumbers todos coletados via modal (LA3554, LA3556, etc.)
 - Busca de pontos desativada temporariamente (só BRL por enquanto)
 

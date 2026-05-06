@@ -83,7 +83,7 @@ interface FlightOffer {
   durationMin:  number;
   stops:        number;
   fares: {
-    brl?:    { amount: number; currency: 'BRL' };
+    cash?:    { amount: number; currency: 'BRL' };
     points?: { amount: number; currency: 'PTS' };   // pontos puro, raro em internacionais
     hybrid?: { points: number; cash: number; currency: 'BRL' };
   };
@@ -92,8 +92,8 @@ interface FlightOffer {
 ```
 
 **Regra de validação (flight.API deve aplicar):**
-- Passagem com `fares = {}` (sem brl, points nem hybrid) → descartar
-- Fares individuais vazios são aceitáveis (pode ter só brl, só hybrid, etc.)
+- Passagem com `fares = {}` (sem cash, points nem hybrid) → descartar
+- Fares individuais vazios são aceitáveis (pode ter só cash, só hybrid, etc.)
 
 ## Fila
 

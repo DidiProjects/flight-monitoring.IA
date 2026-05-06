@@ -30,10 +30,10 @@ function parseDurationMin(text: string): number {
   return (h ? parseInt(h) * 60 : 0) + (m ? parseInt(m) : 0);
 }
 
-// "brl 538,54" or "brl 3.833,64" → 538.54
+// "cash 538,54" or "cash 3.833,64" → 538.54
 function parseBRL(text: string): number | null {
   const raw = text.toLowerCase().replace(/\s/g, '');
-  const m = raw.match(/brl([\d.]+),([\d]{2})/);
+  const m = raw.match(/cash([\d.]+),([\d]{2})/);
   if (!m) return null;
   return parseFloat(m[1]!.replace(/\./g, '') + '.' + m[2]!);
 }
@@ -154,7 +154,7 @@ async function searchDateRange(
       }
 
       const hasCards = await waitForCards(page);
-      await saveSnapshot(page, params.runDir, `latam-${origin}-${destination}-${date}-${redemption ? 'pts' : 'brl'}`);
+      await saveSnapshot(page, params.runDir, `latam-${origin}-${destination}-${date}-${redemption ? 'pts' : 'cash'}`);
 
       if (!hasCards) {
         logger.info({ date, origin, destination }, 'No LATAM flights for this date');
@@ -504,8 +504,8 @@ async function extractCards(
       const pts = parseMiles(card.priceText);
       if (pts !== null && pts > 0) fares.points = { amount: pts, currency: 'PTS' };
     } else {
-      const brl = parseBRL(card.priceText);
-      if (brl !== null && brl > 0) fares.brl = { amount: brl, currency: 'BRL' };
+      const cash = parseBRL(card.priceText);
+      if (cash !== null && cash > 0) fares.cash = { amount: cash, currency: 'BRL' };
     }
 
     if (Object.keys(fares).length === 0) continue;

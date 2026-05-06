@@ -37,7 +37,7 @@ https://www.britishairways.com/nx/b/airselect/en/gbr/book/search/?trip=oneWay&de
 
 Parsers:
 - `parseDurationMin("11 hours 45 minutes")` → 705
-- `parseGBP("£642")` → `{ amount: 642, currency: 'GBP' }` em `fares.brl`
+- `parseGBP("£642")` → `{ amount: 642, currency: 'GBP' }` em `fares.cash`
 - `parseFlightNumber("• BA 247 •")` → "BA247"
 - `parseStops("1 connection")` → 1  (BA usa "connection", não "stop")
 
@@ -75,7 +75,7 @@ Flight details (modal sempre presente no DOM, mesmo colapsado):
 
 Parsers:
 - Origin/dest: `text.trim().replace(/ /g, ' ').split(/\s+/)` → `["16:25", "GRU"]`
-- `parseBRL("R$3,280")` → `{ amount: 3280, currency: 'BRL' }` em `fares.brl`
+- `parseBRL("R$3,280")` → `{ amount: 3280, currency: 'BRL' }` em `fares.cash`
 - `parseFlightNumberOld("BA0246 ...")` → "BA246"  (regex `\b([A-Z][A-Z0-9])0*(\d+)`)
 - `parseDurationMinOld(durationText)` → regex `/(\d+)\s*h/` e `/(\d+)\s*m/`
 - `parseStops("Non-stop")` → 0  (detecta por `/direct|non.?stop/i`)

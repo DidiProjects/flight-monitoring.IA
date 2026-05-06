@@ -20,12 +20,12 @@ Não tinha banco de dados — tudo em arquivo JSON local.
       "runCount": 5,
       "best": {
         "outbound": {
-          "brl": { "amount": 1500.00, "offer": { ...FlightOffer } },
+          "cash": { "amount": 1500.00, "offer": { ...FlightOffer } },
           "pts": { "amount": 50000,   "offer": { ...FlightOffer } },
           "hyb": { "amount": 15000,   "offer": { ...FlightOffer } }
         },
         "return": {
-          "brl": { "amount": 1200.00, "offer": { ...FlightOffer } },
+          "cash": { "amount": 1200.00, "offer": { ...FlightOffer } },
           "pts": null,
           "hyb": null
         }
@@ -33,7 +33,7 @@ Não tinha banco de dados — tudo em arquivo JSON local.
       "lastEmailed": {
         "outbound": 1500.00,
         "return": 1200.00,
-        "type": "brl"
+        "type": "cash"
       },
       "bestOfDayEmailSentAt": "2026-05-01T20:00:00.000Z"
     }
@@ -51,7 +51,7 @@ Não tinha banco de dados — tudo em arquivo JSON local.
 - Se algum voo está dentro do target (com margem): dispara email imediatamente
 - Só envia se o preço melhorou vs `lastEmailed` (evita spam de preço igual)
 - Compara outbound e return separadamente
-- Prioridade de tipo: brl > pts > hyb (primeiro tipo que bate target vira o email)
+- Prioridade de tipo: cash > pts > hyb (primeiro tipo que bate target vira o email)
 
 ### Modo best-of-day (target NÃO atingido)
 - Após 20 runs no dia sem target hit: envia email com melhor preço acumulado
@@ -66,7 +66,7 @@ Não tinha banco de dados — tudo em arquivo JSON local.
 
 ```typescript
 interface Targets {
-  brl?:    number;   // preço alvo em BRL
+  cash?:    number;   // preço alvo em BRL
   pts?:    number;   // preço alvo em pontos puros
   hybPts?: number;   // componente máximo de pontos no híbrido
   hybBrl?: number;   // componente máximo de cash no híbrido

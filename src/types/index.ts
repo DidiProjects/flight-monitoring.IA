@@ -21,7 +21,7 @@ export interface HybridFare {
 }
 
 export interface FlightFares {
-  brl?: Fare;
+  cash?: Fare;
   points?: Fare;
   hybrid?: HybridFare;
 }

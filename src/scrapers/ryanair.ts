@@ -259,7 +259,7 @@ async function extractCards(
     if (price === null || price <= 0) continue;
 
     const fares: FlightFares = {
-      brl: { amount: price, currency: parseCurrency(card.priceText) },
+      cash: { amount: price, currency: parseCurrency(card.priceText) },
     };
 
     offers.push({

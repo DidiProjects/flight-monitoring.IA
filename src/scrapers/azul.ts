@@ -656,12 +656,12 @@ async function collectAllFares(
     const brlMatch = b.priceText.match(/R?\$?([\d.]+)[,.](\d{2})$/);
     if (brlMatch) {
       const amount = parseFloat(brlMatch[1]!.replace(/\./g, '') + '.' + brlMatch[2]!);
-      if (amount > 0) fares.brl = { amount, currency: 'BRL' };
+      if (amount > 0) fares.cash = { amount, currency: 'BRL' };
     } else {
       const brlSimple = b.priceText.match(/[\d.,]+/);
       if (brlSimple) {
         const amount = parseFloat(brlSimple[0]!.replace(/\./g, '').replace(',', '.'));
-        if (amount > 0) fares.brl = { amount, currency: 'BRL' };
+        if (amount > 0) fares.cash = { amount, currency: 'BRL' };
       }
     }
 

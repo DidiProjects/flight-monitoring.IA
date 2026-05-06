@@ -74,7 +74,7 @@ interface FlightOffer {
   durationMin: number;
   stops: number;
   fares: {
-    brl?: { amount: number; currency: 'BRL' };
+    cash?: { amount: number; currency: 'BRL' };
     points?: { amount: number; currency: 'PTS' };  // pontos puro (raro em internacionais)
     hybrid?: { points: number; cash: number; currency: 'BRL' };
   };
