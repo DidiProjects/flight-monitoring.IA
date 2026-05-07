@@ -68,7 +68,7 @@ Dispensado automaticamente pelo scraper após cada navegação (no-op se não ap
 ### Preço BRL (dentro do flight-info-{i}-amount)
 ```
 [data-testid="flight-info-{i}-amount"] [aria-hidden="true"]
-  texto: "brl 538,54" ou "brl 3.833,64"
+  texto: "cash 538,54" ou "cash 3.833,64"
 ```
 
 ### Preço pontos (dentro do footer, modo redemption=true)

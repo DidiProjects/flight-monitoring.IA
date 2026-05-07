@@ -76,7 +76,7 @@ target_pts      INTEGER
 target_hyb_pts  INTEGER
 target_hyb_brl  NUMERIC(10,2)
 margin          NUMERIC(4,3) NOT NULL DEFAULT 0.1  -- 0.1 = 10%
-priority        VARCHAR(3)   NOT NULL DEFAULT 'brl' -- 'brl' | 'pts' | 'hyb'
+priority        VARCHAR(3)   NOT NULL DEFAULT 'cash' -- 'cash' | 'pts' | 'hyb'
 -- notificação
 notification_mode      VARCHAR(30)  NOT NULL  -- ver abaixo
 notification_frequency VARCHAR(10)  NOT NULL  -- 'hourly' | 'daily' | 'monthly'
@@ -144,7 +144,7 @@ id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
 routine_id      UUID        NOT NULL REFERENCES routines(id) ON DELETE CASCADE
 date            DATE        NOT NULL
 is_return       BOOLEAN     NOT NULL DEFAULT false
-fare_type       VARCHAR(3)  NOT NULL  -- 'brl' | 'pts' | 'hyb'
+fare_type       VARCHAR(3)  NOT NULL  -- 'cash' | 'pts' | 'hyb'
 amount          NUMERIC(12,2) NOT NULL  -- valor comparável (BRL, pontos, ou pontos do híbrido)
 flight_offer_id UUID        NOT NULL REFERENCES flight_offers(id) ON DELETE CASCADE
 updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -158,7 +158,7 @@ Mantém as 100 melhores passagens por rotina (menor amount por combinação roti
 id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
 routine_id      UUID        NOT NULL REFERENCES routines(id) ON DELETE CASCADE
 type            VARCHAR(20) NOT NULL  -- 'alert' | 'best_of_day' | 'end_of_period'
-fare_type       VARCHAR(3)  NOT NULL  -- 'brl' | 'pts' | 'hyb'
+fare_type       VARCHAR(3)  NOT NULL  -- 'cash' | 'pts' | 'hyb'
 outbound_amount NUMERIC(12,2)
 return_amount   NUMERIC(12,2)
 email_to        VARCHAR(255) NOT NULL

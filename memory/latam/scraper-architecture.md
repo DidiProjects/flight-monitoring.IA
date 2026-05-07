@@ -27,7 +27,7 @@ searchFlights(params, cpf?, password?)
 
 - URL: `redemption=false`
 - Preço extraído de: `[data-testid="flight-info-{i}-amount"] [aria-hidden="true"]`
-- Formato texto: `"brl 538,54"` → parsed como BRL float
+- Formato texto: `"cash 538,54"` → parsed como BRL float
 
 ## Modo Pontos
 
@@ -110,7 +110,7 @@ Se ausentes: busca apenas BRL.
   latam-{ORIG}-{DEST}.json        ← BRL offers
   latam-{ORIG}-{DEST}-pts.json    ← points offers (só se logado)
 {runDir}/snapshots/
-  latam-{ORIG}-{DEST}-{date}-brl.html   ← snapshot da página após cards aparecerem
+  latam-{ORIG}-{DEST}-{date}-cash.html   ← snapshot da página após cards aparecerem
   modal-card-0.html                      ← snapshot do modal de itinerário (debug, card 0)
 ```
 

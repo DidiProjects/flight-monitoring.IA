@@ -41,7 +41,7 @@ Não tinha banco de dados — tudo em arquivo JSON local.
 }
 ```
 
-- `best.outbound/return` armazena o melhor FlightOffer acumulado do dia por tipo (brl, pts, hyb)
+- `best.outbound/return` armazena o melhor FlightOffer acumulado do dia por tipo (cash, pts, hyb)
 - `lastEmailed` registra o valor (amount) enviado no último email por direção
 - `bestOfDayEmailSentAt` impede reenvio do best-of-day no mesmo dia
 
