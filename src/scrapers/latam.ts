@@ -30,10 +30,10 @@ function parseDurationMin(text: string): number {
   return (h ? parseInt(h) * 60 : 0) + (m ? parseInt(m) : 0);
 }
 
-// "cash 538,54" or "cash 3.833,64" → 538.54
+// "brl 538,54" or "brl 3.833,64" → 538.54
 function parseBRL(text: string): number | null {
   const raw = text.toLowerCase().replace(/\s/g, '');
-  const m = raw.match(/cash([\d.]+),([\d]{2})/);
+  const m = raw.match(/brl([\d.]+),([\d]{2})/);
   if (!m) return null;
   return parseFloat(m[1]!.replace(/\./g, '') + '.' + m[2]!);
 }

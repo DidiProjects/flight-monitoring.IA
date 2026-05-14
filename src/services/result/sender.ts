@@ -15,7 +15,7 @@ function toCallbackOffer(offer: FlightOffer) {
     arrivalTime:   offer.destination.timestamp.slice(11, 16),
     durationMin:   offer.durationMin,
     stops:         offer.stops,
-    currency:      offer.fares.cash?.currency ?? offer.fares.points?.currency,
+    currency:      offer.fares.cash?.currency ?? offer.fares.points?.currency ?? offer.fares.hybrid?.currency,
     fareCash:       offer.fares.cash?.amount    ?? null,
     farePts:       offer.fares.points?.amount ?? null,
     fareHybPts:    offer.fares.hybrid?.points ?? null,
