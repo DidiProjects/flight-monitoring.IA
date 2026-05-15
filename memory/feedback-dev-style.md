@@ -3,11 +3,19 @@ name: Preferências e estilo de desenvolvimento do Diego
 description: Como o Diego quer trabalhar, autonomia, iteração, diagnóstico, comunicação
 type: feedback
 ---
-Trabalhar com máxima autonomia. Não interromper para confirmações a não ser em risco real de perda de dados irreversível.
+Trabalhar com máxima autonomia para edições de código, análise e diagnóstico. Não interromper para confirmações a não ser em risco real de perda de dados irreversível.
 
-**Why:** O usuário quer iteração rápida sem ter que aprovar cada ação.
+**Why:** O usuário quer iteração rápida sem ter que aprovar cada ação de código.
 
-**How to apply:** Executar diretamente. Só pausar se houver risco real (ex: apagar branch remota, deletar dados de produção).
+**How to apply:** Executar edições diretamente. Só pausar se houver risco real (ex: apagar branch remota, deletar dados de produção).
+
+---
+
+Nunca iniciar o servidor de desenvolvimento (`npx tsx src/main.ts`) nem disparar jobs de scrape automaticamente. Esperar o usuário rodar a API e fornecer os resultados.
+
+**Why:** O usuário quer controlar quando e como a API é executada. Rodar automaticamente interfere no fluxo dele.
+
+**How to apply:** Ao pedir "análise" ou "verificação" de scraper, analisar o código e os arquivos existentes em `scraping-result/`. Se precisar de um novo teste, fornecer o comando PowerShell para o usuário executar — nunca rodar por conta própria.
 
 ---
 
