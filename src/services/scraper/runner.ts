@@ -65,7 +65,7 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
       error:       scraperError,
     });
   } catch (sendErr) {
-    logger.warn({ requestId: request.requestId, sendErr }, 'Failed to deliver callback to flight.API');
+    logger.warn({ requestId: request.requestId, err: sendErr instanceof Error ? { message: sendErr.message, code: (sendErr as NodeJS.ErrnoException).code } : sendErr }, 'Failed to deliver callback to flight.API');
   } finally {
     await pruneOldRuns();
   }
