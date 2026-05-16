@@ -11,7 +11,9 @@
       "Bash(Format-Table -AutoSize)",
       "PowerShell(grep *)",
       "Bash(powershell -NoProfile -NonInteractive -File \"C:\\\\Users\\\\diego\\\\.claude\\\\statusline.ps1\")",
-      "Bash(powershell -NoProfile -NonInteractive -File \"C:\\\\Users\\\\diego\\\\.claude\\\\subagent-statusline.ps1\")"
+      "Bash(powershell -NoProfile -NonInteractive -File \"C:\\\\Users\\\\diego\\\\.claude\\\\subagent-statusline.ps1\")",
+      "Bash(Select-Object -First 30 FullName)",
+      "Bash(npm run *)"
     ]
   }
 }
