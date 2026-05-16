@@ -8,7 +8,9 @@
       "Bash(Select-Object FullName)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\flight.API\" -Depth 1)",
       "Bash(Select-Object FullName, PSIsContainer)",
-      "Bash(Format-Table -AutoSize)"
+      "Bash(Format-Table -AutoSize)",
+      "PowerShell(grep *)",
+      "Bash(powershell -NoProfile -NonInteractive -File \"C:\\\\Users\\\\diego\\\\.claude\\\\statusline.ps1\")"
     ]
   }
 }

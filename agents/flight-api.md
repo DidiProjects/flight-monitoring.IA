@@ -84,7 +84,7 @@ npm test             # vitest
 - `POST {SCRAPING_API_URL}/scrape` — dispara busca no `scraping.API` (header `x-api-key`)
 - Emails via SMTP: alertas, reset de senha, senha provisória, links de unsubscribe
 
-**Banco:** lê/escreve em todas as tabelas via repositórios (users, routines, flight_offers, best_fares, notification_log, etc.)
+**Banco:** acessa o PostgreSQL via repositórios internos (pg.Pool). Schema, tabelas e estrutura de dados estão documentados no projeto **flight.DB** — consultar lá para qualquer dúvida sobre colunas, constraints ou migrações.
 
 ## Scheduler interno
 
