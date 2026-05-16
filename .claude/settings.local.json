@@ -20,7 +20,12 @@
       "PowerShell(Remove-Item *)",
       "PowerShell(npm view *)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(list\\(d.get\\('exports',{}\\).keys\\(\\)\\)[:15]\\)\")",
-      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const j=JSON.parse\\(d\\); console.log\\(Object.keys\\(j.exports||{}\\).slice\\(0,15\\).join\\('\\\\n'\\)\\)\")"
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const j=JSON.parse\\(d\\); console.log\\(Object.keys\\(j.exports||{}\\).slice\\(0,15\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(Select-String \"stat|bar\")",
+      "Bash(dir \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\flight-monitoring.IA\\\\scripts\\\\grafana\\\\node_modules\\\\@grafana\\\\grafana-foundation-sdk\\\\dist\")",
+      "Bash(findstr /i \"stat bar\")",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\flight-monitoring.IA\\\\scripts\\\\grafana\\\\node_modules\\\\@grafana\\\\grafana-foundation-sdk\\\\dist\" | Where-Object { $_.Name -match \"stat|bar\" } | Select-Object Name)",
+      "Bash(node -e \"const j=JSON.parse\\(require\\('fs'\\).readFileSync\\('grafana-flight-monitoring.json'\\)\\); j.panels.forEach\\(p => console.log\\(p.type.padEnd\\(12\\), JSON.stringify\\(p.gridPos\\), \\(p.title||''\\).substring\\(0,40\\)\\)\\)\")"
     ]
   }
 }

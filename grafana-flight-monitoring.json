@@ -189,11 +189,10 @@
       }
     },
     {
-      "type": "timeseries",
+      "type": "stat",
       "transparent": false,
       "repeatDirection": "h",
-      "title": "Erros por Airline",
-      "description": "Uma curva por airline. Novas airlines surgem automaticamente.",
+      "title": "Ocorrências no período — por airline",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
@@ -202,20 +201,67 @@
         "x": 17,
         "y": 1,
         "w": 7,
-        "h": 12
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "sum by (airline) (count_over_time({app=\"scraping-api\", level=~\"error|warning\"} | json | airline != \"\" [$__range]))",
+          "refId": "A",
+          "legendFormat": "{{airline}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "graphMode": "none",
+        "colorMode": "background",
+        "justifyMode": "auto",
+        "textMode": "value_and_name",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "values": false
+        },
+        "percentChangeColorMode": "standard",
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "title": "Erros por Airline",
+      "description": "Contagem de erros por janela de tempo, empilhada por airline.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 17,
+        "y": 7,
+        "w": 7,
+        "h": 9
       },
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "barAlignment": 0,
+            "lineWidth": 0,
+            "fillOpacity": 70,
             "showPoints": "never",
             "spanNulls": false,
-            "axisLabel": "acumulado",
+            "axisLabel": "ocorrências",
             "stacking": {
-              "mode": "none",
+              "mode": "normal",
               "group": "A"
             }
           }
@@ -228,8 +274,7 @@
           "placement": "bottom",
           "showLegend": true,
           "calcs": [
-            "last",
-            "max"
+            "sum"
           ]
         },
         "tooltip": {
@@ -237,18 +282,6 @@
           "sort": "desc"
         }
       },
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "mode": "cumulativeFunctions",
-            "cumulative": {
-              "field": ""
-            },
-            "replaceFields": true
-          }
-        }
-      ],
       "targets": [
         {
           "expr": "sum by (airline) (count_over_time({app=\"scraping-api\", level=\"error\"} | json | airline != \"\" [$__interval]))",
@@ -270,22 +303,22 @@
       },
       "gridPos": {
         "x": 17,
-        "y": 13,
+        "y": 16,
         "w": 7,
-        "h": 12
+        "h": 9
       },
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "barAlignment": 0,
+            "lineWidth": 0,
+            "fillOpacity": 70,
             "showPoints": "never",
             "spanNulls": false,
-            "axisLabel": "acumulado",
+            "axisLabel": "ocorrências",
             "stacking": {
-              "mode": "none",
+              "mode": "normal",
               "group": "A"
             }
           }
@@ -298,8 +331,7 @@
           "placement": "bottom",
           "showLegend": true,
           "calcs": [
-            "last",
-            "max"
+            "sum"
           ]
         },
         "tooltip": {
@@ -307,18 +339,6 @@
           "sort": "desc"
         }
       },
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "mode": "cumulativeFunctions",
-            "cumulative": {
-              "field": ""
-            },
-            "replaceFields": true
-          }
-        }
-      ],
       "targets": [
         {
           "expr": "sum by (airline) (count_over_time({app=\"scraping-api\", level=\"warning\"} | json [$__interval]))",
@@ -336,7 +356,7 @@
       "title": "flight.API — Logs & Métricas",
       "gridPos": {
         "x": 0,
-        "y": 37,
+        "y": 34,
         "h": 1,
         "w": 24
       }
@@ -377,6 +397,83 @@
       }
     },
     {
+      "type": "stat",
+      "transparent": false,
+      "repeatDirection": "h",
+      "title": "Ocorrências no período",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 17,
+        "y": 27,
+        "w": 7,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "sum by (level) (count_over_time({app=\"flight-api\", level=~\"error|warning\"} [$__range]))",
+          "refId": "A",
+          "legendFormat": "{{level}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "graphMode": "none",
+        "colorMode": "background",
+        "justifyMode": "auto",
+        "textMode": "value_and_name",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "values": false
+        },
+        "percentChangeColorMode": "standard",
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "warning"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF9900",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "error"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#E02F44",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "type": "timeseries",
       "transparent": false,
       "repeatDirection": "h",
@@ -388,22 +485,22 @@
       },
       "gridPos": {
         "x": 17,
-        "y": 27,
+        "y": 33,
         "w": 7,
-        "h": 24
+        "h": 18
       },
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "barAlignment": 0,
+            "lineWidth": 0,
+            "fillOpacity": 70,
             "showPoints": "never",
             "spanNulls": false,
-            "axisLabel": "acumulado",
+            "axisLabel": "ocorrências",
             "stacking": {
-              "mode": "none",
+              "mode": "normal",
               "group": "A"
             }
           }
@@ -447,8 +544,7 @@
           "placement": "bottom",
           "showLegend": true,
           "calcs": [
-            "last",
-            "max"
+            "sum"
           ]
         },
         "tooltip": {
@@ -456,18 +552,6 @@
           "sort": "desc"
         }
       },
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "mode": "cumulativeFunctions",
-            "cumulative": {
-              "field": ""
-            },
-            "replaceFields": true
-          }
-        }
-      ],
       "targets": [
         {
           "expr": "sum by (level) (count_over_time({app=\"flight-api\", level=~\"error|warning\"} [$__interval]))",
