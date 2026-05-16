@@ -9,9 +9,21 @@ import { env } from '../../config/env.ts';
 import type { ScrapeRequest, ScrapeResult } from '../../types/scrape.ts';
 import type { FlightOffer } from '../../types/index.ts';
 
+function categorizeError(err: unknown): string {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  if (msg.includes('comportamento incomum') || msg.includes('acesso foi limitado') || msg.includes('bot')) return 'bot_detection';
+  if (msg.includes('timeout') || msg.includes('timed out')) return 'timeout';
+  if (msg.includes('navigation') || msg.includes('navigate')) return 'navigation';
+  if (msg.includes('unsupported airline')) return 'unsupported_airline';
+  return 'unknown';
+}
+
 export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
+  const startTime = Date.now();
+  const logCtx = { requestId: request.requestId, routineId: request.routineId, airline: request.airline, origin: request.origin, destination: request.destination };
+
   const run = await createRun(request.requestId, request.routineId, request.origin, request.destination);
-  logger.info({ requestId: request.requestId, routineId: request.routineId, runDir: run.dir }, 'Scrape job started');
+  logger.info({ ...logCtx, runDir: run.dir }, 'Scrape job started');
 
   const send = async (result: ScrapeResult) => {
     const payload = buildCallbackPayload(result);
@@ -48,16 +60,18 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
     }
 
     await saveResults(run, flights);
+    logger.info({ ...logCtx, results_count: flights.length, duration_ms: Date.now() - startTime, status: 'success' }, 'Scrape job completed');
   } catch (err) {
     scraperError = err instanceof Error ? err.message : String(err);
     await run.saveError(err);
-    logger.error({ requestId: request.requestId, routineId: request.routineId, err }, 'Scrape job failed');
+    logger.error({ ...logCtx, err, error_type: categorizeError(err), duration_ms: Date.now() - startTime, status: 'error' }, 'Scrape job failed');
   }
 
   try {
     await send({
       requestId:   request.requestId,
       routineId:   request.routineId,
+      airline:     request.airline,
       origin:      request.origin,
       destination: request.destination,
       flights,
@@ -65,7 +79,7 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
       error:       scraperError,
     });
   } catch (sendErr) {
-    logger.warn({ requestId: request.requestId, err: sendErr instanceof Error ? { message: sendErr.message, code: (sendErr as NodeJS.ErrnoException).code } : sendErr }, 'Failed to deliver callback to flight.API');
+    logger.warn({ ...logCtx, err: sendErr instanceof Error ? { message: sendErr.message, code: (sendErr as NodeJS.ErrnoException).code } : sendErr, status: 'error' }, 'Failed to deliver callback to flight.API');
   } finally {
     await pruneOldRuns();
   }

@@ -38,5 +38,14 @@ export function buildCallbackPayload(result: ScrapeResult) {
 export async function sendResult(result: ScrapeResult): Promise<void> {
   const payload = buildCallbackPayload(result);
   await post(`${env.FLIGHT_API_URL}/scrape/results`, payload, env.FLIGHT_API_KEY);
-  logger.info({ requestId: result.requestId, routineId: result.routineId }, 'Result sent to flight.API');
+  logger.info({
+    requestId:     result.requestId,
+    routineId:     result.routineId,
+    airline:       result.airline,
+    origin:        result.origin,
+    destination:   result.destination,
+    results_count: result.flights.length,
+    has_error:     !!result.error,
+    status:        result.error ? 'error' : 'success',
+  }, 'Result sent to flight.API');
 }
