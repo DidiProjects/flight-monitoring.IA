@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\" -Depth 1 | Where-Object { $_.Name -match '\\\\.env|\\\\.md|\\\\.txt' })",
+      "Bash(Get-ChildItem -Path . -Depth 2)",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\flight.API\" -Depth 1)",
+      "Bash(Select-Object FullName, PSIsContainer)",
+      "Bash(Format-Table -AutoSize)"
+    ]
+  }
+}
