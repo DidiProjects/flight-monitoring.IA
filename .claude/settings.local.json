@@ -13,7 +13,11 @@
       "Bash(powershell -NoProfile -NonInteractive -File \"C:\\\\Users\\\\diego\\\\.claude\\\\statusline.ps1\")",
       "Bash(powershell -NoProfile -NonInteractive -File \"C:\\\\Users\\\\diego\\\\.claude\\\\subagent-statusline.ps1\")",
       "Bash(Select-Object -First 30 FullName)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(gh run *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\flight.FRONT\" -Recurse -Directory | Select-Object -First 20 | ForEach-Object { $_.FullName })",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Remove-Item *)"
     ]
   }
 }
