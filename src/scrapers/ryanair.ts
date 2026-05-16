@@ -10,6 +10,8 @@ import { humanDelay } from '../browser/human.ts';
 import { toTimestamp } from '../utils/airports.ts';
 import type { FlightOffer, FlightFares, ScraperParams } from '../types/index.ts';
 
+type LogCtx = { requestId?: string; routineId?: string; airline?: string };
+
 const SEARCH_BASE = 'https://www.ryanair.com/gb/en/trip/flights/select';
 
 function buildSearchUrl(origin: string, destination: string, date: string, passengers: number): string {
@@ -113,6 +115,7 @@ async function searchDateRange(
   isReturn: boolean,
   params: ScraperParams,
 ): Promise<FlightOffer[]> {
+  const logCtx: LogCtx = { requestId: params.requestId, routineId: params.routineId, airline: params.airline };
   const context = await browser.newContext({
     locale: 'en-GB',
     timezoneId: 'Europe/London',
@@ -137,7 +140,7 @@ async function searchDateRange(
       await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
       await humanDelay(1_500, 2_500);
 
-      const hasCards = await waitForCards(page);
+      const hasCards = await waitForCards(page, logCtx);
       await saveSnapshot(page, params.runDir, `ryanair-${origin}-${destination}-${date}`);
 
       if (!hasCards) {
@@ -180,7 +183,7 @@ async function searchDateRange(
 
 // ── Wait for cards ──────────────────────────────────────────────────────────────
 
-async function waitForCards(page: Page): Promise<boolean> {
+async function waitForCards(page: Page, logCtx: LogCtx = {}): Promise<boolean> {
   const deadline = Date.now() + 45_000;
 
   while (Date.now() < deadline) {
@@ -197,7 +200,7 @@ async function waitForCards(page: Page): Promise<boolean> {
     await page.waitForTimeout(1_000);
   }
 
-  logger.warn('Ryanair waitForCards timed out');
+  logger.warn({ ...logCtx }, 'Ryanair waitForCards timed out');
   return false;
 }
 

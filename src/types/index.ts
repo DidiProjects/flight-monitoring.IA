@@ -7,6 +7,9 @@ export interface ScraperParams {
   returnEnd?: string;
   passengers: number;
   runDir: string;
+  requestId?: string;
+  routineId?: string;
+  airline?: string;
 }
 
 export interface Fare {

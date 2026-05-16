@@ -14,6 +14,8 @@ import { humanDelay } from '../browser/human.ts';
 import { toTimestamp } from '../utils/airports.ts';
 import type { FlightOffer, FlightFares, ScraperParams } from '../types/index.ts';
 
+type LogCtx = { requestId?: string; routineId?: string; airline?: string };
+
 const AZUL_HOME    = 'https://www.voeazul.com.br/br/pt/home';
 const AZUL_RESULTS = 'https://www.voeazul.com.br/br/pt/home/selecao-voo';
 
@@ -80,20 +82,21 @@ async function searchRoute(
   });
 
   const allOffers: FlightOffer[] = [];
+  const logCtx: LogCtx = { requestId: params.requestId, routineId: params.routineId, airline: params.airline };
 
   try {
-    logger.info({ origin, destination, startDate, endDate }, 'Opening search page');
+    logger.info({ ...logCtx, origin, destination, startDate, endDate }, 'Opening search page');
 
     // ── Primary path: direct URL navigation (up to 3 attempts) ───────────────
     let firstLoaded = false;
-    const directOk = await tryDirectNavigation(page, origin, destination, startDate, params.passengers);
+    const directOk = await tryDirectNavigation(page, origin, destination, startDate, params.passengers, logCtx);
 
     if (directOk) {
-      firstLoaded = await waitForResults(page);
+      firstLoaded = await waitForResults(page, logCtx);
       await saveSnapshot(page, params.runDir, `${origin}-${destination}-${startDate}-results`);
     } else {
       // ── Fallback: home page + form fill ───────────────────────────────────
-      logger.info({ origin, destination }, 'Direct URL failed, falling back to form fill');
+      logger.info({ ...logCtx, origin, destination }, 'Direct URL failed, falling back to form fill');
 
       await page.goto(AZUL_HOME, { waitUntil: 'load', timeout: 60_000 });
       await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
@@ -104,11 +107,11 @@ async function searchRoute(
       await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
       await humanDelay(800, 1_200);
       await hideOnetrust(page);
-      await waitForSearchForm(page);
+      await waitForSearchForm(page, logCtx);
       logger.debug('Form ready');
       await saveSnapshot(page, params.runDir, `${origin}-${destination}-home`);
-      await fillSearchForm(page, origin, destination, startDate, params.passengers);
-      firstLoaded = await waitForResults(page);
+      await fillSearchForm(page, origin, destination, startDate, params.passengers, logCtx);
+      firstLoaded = await waitForResults(page, logCtx);
       await saveSnapshot(page, params.runDir, `${origin}-${destination}-${startDate}-results`);
     }
     const dates = [...dateRange(startDate, endDate)];
@@ -125,18 +128,18 @@ async function searchRoute(
       } else {
         // Primary: direct URL navigation for this specific date
         let loaded: boolean;
-        const ok = await tryDirectNavigation(page, origin, destination, date, params.passengers);
+        const ok = await tryDirectNavigation(page, origin, destination, date, params.passengers, logCtx);
         if (ok) {
-          loaded = await waitForResults(page);
+          loaded = await waitForResults(page, logCtx);
         } else {
           // Fallback: calendar navigation (only works if still on the results page)
-          logger.warn({ date }, 'Direct URL failed, trying calendar navigation');
-          const navigated = await navigateCalendarToDate(page, date);
+          logger.warn({ ...logCtx, date }, 'Direct URL failed, trying calendar navigation');
+          const navigated = await navigateCalendarToDate(page, date, logCtx);
           if (!navigated) {
-            logger.warn({ date, origin, destination }, 'Calendar navigation also failed, skipping date');
+            logger.warn({ ...logCtx, date, origin, destination }, 'Calendar navigation also failed, skipping date');
             continue;
           }
-          loaded = await waitForResults(page);
+          loaded = await waitForResults(page, logCtx);
         }
         await saveSnapshot(page, params.runDir, `${origin}-${destination}-${date}-results`);
         if (!loaded) {
@@ -146,7 +149,7 @@ async function searchRoute(
       }
 
       // Collect all fares (BRL + points + hybrid) in a single pass
-      const flights = await collectAllFares(page, origin, destination, date, params.runDir);
+      const flights = await collectAllFares(page, origin, destination, date, params.runDir, logCtx);
       flights.forEach(o => { o.isReturn = isReturn; });
 
       logger.info({ date, origin, destination, count: flights.length }, 'Date collected');
@@ -205,6 +208,7 @@ async function tryDirectNavigation(
   destination: string,
   date: string,
   passengers: number,
+  logCtx: LogCtx = {},
 ): Promise<boolean> {
   const url = buildSearchUrl(origin, destination, date, 'BRL', passengers);
 
@@ -228,7 +232,7 @@ async function tryDirectNavigation(
       ).catch(() => false);
 
       if (!onResults) {
-        logger.warn({ attempt }, 'Direct navigation redirected away from results, retrying');
+        logger.warn({ ...logCtx, attempt }, 'Direct navigation redirected away from results, retrying');
         if (attempt < 3) await humanDelay(2_000, 3_000);
         continue;
       }
@@ -236,12 +240,12 @@ async function tryDirectNavigation(
       logger.info({ origin, destination, date, attempt }, 'Direct URL navigation succeeded');
       return true;
     } catch (err) {
-      logger.warn({ attempt, err: String(err).slice(0, 120) }, 'Direct URL navigation attempt failed');
+      logger.warn({ ...logCtx, attempt, err: String(err).slice(0, 120) }, 'Direct URL navigation attempt failed');
       if (attempt < 3) await humanDelay(2_000, 3_000);
     }
   }
 
-  logger.warn({ origin, destination, date }, 'All direct URL attempts failed, will use form fill');
+  logger.warn({ ...logCtx, origin, destination, date }, 'All direct URL attempts failed, will use form fill');
   return false;
 }
 
@@ -270,12 +274,12 @@ async function hideOnetrust(page: Page): Promise<void> {
   await page.waitForTimeout(500);
 }
 
-async function waitForSearchForm(page: Page): Promise<void> {
+async function waitForSearchForm(page: Page, logCtx: LogCtx = {}): Promise<void> {
   await page
     .locator('input[aria-label*="Origem" i]')
     .first()
     .waitFor({ state: 'attached', timeout: 20_000 })
-    .catch(() => logger.warn('Search form attach timeout, proceeding'));
+    .catch(() => logger.warn({ ...logCtx }, 'Search form attach timeout, proceeding'));
 }
 
 // Converts "YYYY-MM-DD" → "DDMMYYYY" (Azul date input format)
@@ -292,6 +296,7 @@ async function fillSearchForm(
   destination: string,
   date: string,
   passengers: number,
+  logCtx: LogCtx = {},
 ): Promise<void> {
   logger.debug({ origin, destination, date }, 'Filling search form');
 
@@ -300,7 +305,7 @@ async function fillSearchForm(
   await humanDelay(300, 600);
   await page.keyboard.type(origin, { delay: 80 + Math.random() * 80 });
   await humanDelay(800, 1_400);
-  await selectAirportOption(page, origin);
+  await selectAirportOption(page, origin, logCtx);
   await humanDelay(600, 1_000);
 
   // Destination
@@ -308,7 +313,7 @@ async function fillSearchForm(
   await humanDelay(300, 600);
   await page.keyboard.type(destination, { delay: 80 + Math.random() * 80 });
   await humanDelay(800, 1_400);
-  await selectAirportOption(page, destination);
+  await selectAirportOption(page, destination, logCtx);
   await humanDelay(400, 800);
 
   // Date, type DDMMYYYY directly (no modal opens)
@@ -360,7 +365,7 @@ async function clickVisibleContainer(page: Page, inputSel: string): Promise<void
 }
 
 // Selects the airport code option from the autocomplete dropdown
-async function selectAirportOption(page: Page, code: string): Promise<void> {
+async function selectAirportOption(page: Page, code: string, logCtx: LogCtx = {}): Promise<void> {
   // Poll for autocomplete options to appear (avoids page.waitForFunction serialization issues)
   const optionLoc = page.locator('button[role="option"]');
   const pollStart = Date.now();
@@ -382,7 +387,7 @@ async function selectAirportOption(page: Page, code: string): Promise<void> {
   }, code);
 
   if (!clicked) {
-    logger.warn({ code }, 'Autocomplete option not found, pressing Enter');
+    logger.warn({ ...logCtx, code }, 'Autocomplete option not found, pressing Enter');
     await page.keyboard.press('Enter');
   }
 }
@@ -420,7 +425,7 @@ async function setPassengers(page: Page, count: number): Promise<void> {
 
 // Returns true if results loaded, false if empty-state (no flights available).
 // Uses locator polling, avoids page.waitForFunction serialization issues with tsx.
-async function waitForResults(page: Page): Promise<boolean> {
+async function waitForResults(page: Page, logCtx: LogCtx = {}): Promise<boolean> {
   const deadline = Date.now() + 25_000;
 
   while (Date.now() < deadline) {
@@ -439,13 +444,13 @@ async function waitForResults(page: Page): Promise<boolean> {
     await page.waitForTimeout(500);
   }
 
-  logger.warn('waitForResults timed out, proceeding');
+  logger.warn({ ...logCtx }, 'waitForResults timed out, proceeding');
   return true;
 }
 
 // ── Booking-calendar navigation ───────────────────────────────────────────────
 
-async function navigateCalendarToDate(page: Page, date: string): Promise<boolean> {
+async function navigateCalendarToDate(page: Page, date: string, logCtx: LogCtx = {}): Promise<boolean> {
   const [, month, day] = date.split('-')!;
   const ddmm = `${day}/${month}`; // "25/05"
 
@@ -465,14 +470,14 @@ async function navigateCalendarToDate(page: Page, date: string): Promise<boolean
   if (clicked) {
     await humanDelay(800, 1_500);
   } else {
-    logger.warn({ date, ddmm }, 'Calendar date button not found');
+    logger.warn({ ...logCtx, date, ddmm }, 'Calendar date button not found');
   }
   return clicked;
 }
 
 // ── Currency toggle ───────────────────────────────────────────────────────────
 
-async function setCurrencyView(page: Page, view: 'Reais' | 'Pontos'): Promise<void> {
+async function setCurrencyView(page: Page, view: 'Reais' | 'Pontos', logCtx: LogCtx = {}): Promise<void> {
   const isPoints = view === 'Pontos';
   const value    = isPoints ? 'score' : 'currency';
 
@@ -510,7 +515,7 @@ async function setCurrencyView(page: Page, view: 'Reais' | 'Pontos'): Promise<vo
   const errorBtn = page.locator('button:text("Ok, entendi")').first();
   if ((await errorBtn.count().catch(() => 0)) > 0) {
     await errorBtn.click({ timeout: 3_000 }).catch(() => {});
-    logger.warn({ view }, 'Dismissed error modal after currency switch');
+    logger.warn({ ...logCtx, view }, 'Dismissed error modal after currency switch');
   }
 
   // Wait for at least one fare price element to reflect the new view
@@ -540,9 +545,10 @@ async function collectAllFares(
   destination: string,
   date: string,
   runDir?: string,
+  logCtx: LogCtx = {},
 ): Promise<FlightOffer[]> {
   // ── Step 1: BRL view ──────────────────────────────────────────────────────
-  await setCurrencyView(page, 'Reais');
+  await setCurrencyView(page, 'Reais', logCtx);
   await humanDelay(600, 1_000);
 
   type BrlCard = {
@@ -584,7 +590,7 @@ async function collectAllFares(
   });
 
   // ── Step 2: Points view ───────────────────────────────────────────────────
-  await setCurrencyView(page, 'Pontos');
+  await setCurrencyView(page, 'Pontos', logCtx);
 
   // setCurrencyView already waited for "pontos" to appear in the fare price text
   await humanDelay(400, 700);

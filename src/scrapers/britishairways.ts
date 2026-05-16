@@ -10,6 +10,8 @@ import { humanDelay } from '../browser/human.ts';
 import { toTimestamp } from '../utils/airports.ts';
 import type { FlightOffer, FlightFares, ScraperParams } from '../types/index.ts';
 
+type LogCtx = { requestId?: string; routineId?: string; airline?: string };
+
 const SEARCH_BASE = 'https://www.britishairways.com/nx/b/airselect/en/gbr/book/search/';
 
 function buildSearchUrl(
@@ -130,6 +132,7 @@ async function searchDateRange(
   isReturn: boolean,
   params: ScraperParams,
 ): Promise<FlightOffer[]> {
+  const logCtx: LogCtx = { requestId: params.requestId, routineId: params.routineId, airline: params.airline };
   const context = await browser.newContext({
     locale: 'en-GB',
     timezoneId: 'Europe/London',
@@ -155,7 +158,7 @@ async function searchDateRange(
       await humanDelay(1_500, 2_500);
       await dismissCookieBanner(page);
 
-      const hasCards = await waitForCards(page);
+      const hasCards = await waitForCards(page, logCtx);
       await saveSnapshot(page, params.runDir, `ba-${origin}-${destination}-${date}`);
 
       if (!hasCards) {
@@ -208,7 +211,7 @@ async function dismissCookieBanner(page: Page): Promise<void> {
 
 // ── Wait for cards ──────────────────────────────────────────────────────────────
 
-async function waitForCards(page: Page): Promise<boolean> {
+async function waitForCards(page: Page, logCtx: LogCtx = {}): Promise<boolean> {
   const deadline = Date.now() + 60_000;
 
   while (Date.now() < deadline) {
@@ -229,7 +232,7 @@ async function waitForCards(page: Page): Promise<boolean> {
     await page.waitForTimeout(1_000);
   }
 
-  logger.warn('BA waitForCards timed out');
+  logger.warn({ ...logCtx }, 'BA waitForCards timed out');
   return false;
 }
 

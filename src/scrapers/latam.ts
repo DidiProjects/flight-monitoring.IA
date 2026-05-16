@@ -10,6 +10,8 @@ import { humanDelay } from '../browser/human.ts';
 import { toTimestamp } from '../utils/airports.ts';
 import type { FlightOffer, FlightFares, ScraperParams } from '../types/index.ts';
 
+type LogCtx = { requestId?: string; routineId?: string; airline?: string };
+
 const SEARCH_URL = 'https://www.latamairlines.com/br/pt/oferta-voos';
 
 function buildSearchUrl(
@@ -114,6 +116,7 @@ async function searchDateRange(
   cpf?: string,
   password?: string,
 ): Promise<FlightOffer[]> {
+  const logCtx: LogCtx = { requestId: params.requestId, routineId: params.routineId, airline: params.airline };
   const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
 
@@ -142,9 +145,9 @@ async function searchDateRange(
 
       // Login once for points searches
       if (redemption && !loggedIn && cpf && password) {
-        loggedIn = await latamLogin(page, cpf, password);
+        loggedIn = await latamLogin(page, cpf, password, logCtx);
         if (!loggedIn) {
-          logger.warn('LATAM login failed, skipping points search for remaining dates');
+          logger.warn({ ...logCtx }, 'LATAM login failed, skipping points search for remaining dates');
           break;
         }
         // Re-navigate to search URL after login
@@ -153,7 +156,7 @@ async function searchDateRange(
         await humanDelay(1_000, 2_000);
       }
 
-      const hasCards = await waitForCards(page);
+      const hasCards = await waitForCards(page, logCtx);
       await saveSnapshot(page, params.runDir, `latam-${origin}-${destination}-${date}-${redemption ? 'pts' : 'cash'}`);
 
       if (!hasCards) {
@@ -226,7 +229,7 @@ async function dismissCountrySuggestion(page: Page): Promise<void> {
 
 // ── Login ──────────────────────────────────────────────────────────────────────
 
-async function latamLogin(page: Page, cpf: string, password: string): Promise<boolean> {
+async function latamLogin(page: Page, cpf: string, password: string, logCtx: LogCtx = {}): Promise<boolean> {
   try {
     const cpfInput = page.locator('[data-testid="form-input--alias-textfield-input"]');
     await cpfInput.waitFor({ state: 'visible', timeout: 15_000 });
@@ -267,7 +270,7 @@ async function latamLogin(page: Page, cpf: string, password: string): Promise<bo
     }
 
     if (outcome === 'timeout') {
-      logger.warn('LATAM login: no cards or 2FA detected within 15s');
+      logger.warn({ ...logCtx }, 'LATAM login: no cards or 2FA detected within 15s');
       return false;
     }
 
@@ -296,7 +299,7 @@ async function latamLogin(page: Page, cpf: string, password: string): Promise<bo
     }
 
     if (!code) {
-      logger.warn('LATAM 2FA: code not obtained after 5 attempts, skipping points');
+      logger.warn({ ...logCtx }, 'LATAM 2FA: code not obtained after 5 attempts, skipping points');
       return false;
     }
 
@@ -316,17 +319,17 @@ async function latamLogin(page: Page, cpf: string, password: string): Promise<bo
       return true;
     }
 
-    logger.warn('LATAM 2FA: cards did not appear after code submission');
+    logger.warn({ ...logCtx }, 'LATAM 2FA: cards did not appear after code submission');
     return false;
   } catch (err) {
-    logger.warn({ err: String(err).slice(0, 120) }, 'LATAM login error');
+    logger.warn({ ...logCtx, err: String(err).slice(0, 120) }, 'LATAM login error');
     return false;
   }
 }
 
 // ── Wait for cards ─────────────────────────────────────────────────────────────
 
-async function waitForCards(page: Page): Promise<boolean> {
+async function waitForCards(page: Page, logCtx: LogCtx = {}): Promise<boolean> {
   const deadline = Date.now() + 90_000;
 
   while (Date.now() < deadline) {
@@ -342,7 +345,7 @@ async function waitForCards(page: Page): Promise<boolean> {
     await page.waitForTimeout(500);
   }
 
-  logger.warn('waitForCards timed out');
+  logger.warn({ ...logCtx }, 'waitForCards timed out');
   return false;
 }
 

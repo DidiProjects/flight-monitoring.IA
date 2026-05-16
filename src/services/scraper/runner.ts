@@ -44,6 +44,9 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
       returnEnd:     request.returnEnd,
       passengers:    request.passengers,
       runDir:        run.dir,
+      requestId:     request.requestId,
+      routineId:     request.routineId,
+      airline:       request.airline,
     };
 
     const airline = request.airline.toLowerCase();
