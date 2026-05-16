@@ -10,7 +10,8 @@
       "Bash(Select-Object FullName, PSIsContainer)",
       "Bash(Format-Table -AutoSize)",
       "PowerShell(grep *)",
-      "Bash(powershell -NoProfile -NonInteractive -File \"C:\\\\Users\\\\diego\\\\.claude\\\\statusline.ps1\")"
+      "Bash(powershell -NoProfile -NonInteractive -File \"C:\\\\Users\\\\diego\\\\.claude\\\\statusline.ps1\")",
+      "Bash(powershell -NoProfile -NonInteractive -File \"C:\\\\Users\\\\diego\\\\.claude\\\\subagent-statusline.ps1\")"
     ]
   }
 }
