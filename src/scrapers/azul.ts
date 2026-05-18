@@ -31,7 +31,7 @@ function buildSearchUrl(origin: string, destination: string, date: string, curre
 
 export async function searchFlights(params: ScraperParams): Promise<FlightOffer[]> {
   const foxOptions = await camoufoxLaunchOptions({
-    headless: true,
+    headless: false,
     os: 'windows',
     locale: 'pt-BR',
     humanize: true,
