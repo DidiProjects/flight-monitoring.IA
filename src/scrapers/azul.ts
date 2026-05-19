@@ -228,13 +228,20 @@ async function tryDirectNavigation(
       await acceptCookies(page);
       await hideOnetrust(page);
 
-      // Verify we landed on the results page, not silently redirected to home
-      const onResults = await page.evaluate(() =>
-        window.location.pathname.includes('selecao-voo') ||
-        document.querySelector('div.flight-card') !== null ||
-        document.querySelector('p.results') !== null ||
-        document.querySelector('.booking-calendar__cards') !== null,
-      ).catch(() => false);
+      // Verify we landed on the results page, not silently redirected to home.
+      // NOTE: checking the URL alone is not enough — when Azul's SPA has no session
+      // state it stays on selecao-voo but renders an empty-cart view ("Informar
+      // viajantes"). That false-positive is filtered out by the isEmptyCart guard.
+      const onResults = await page.evaluate(() => {
+        const bodyText = document.body?.innerText ?? '';
+        const isEmptyCart = /informar viajantes/i.test(bodyText);
+        return (
+          (window.location.pathname.includes('selecao-voo') && !isEmptyCart) ||
+          document.querySelector('div.flight-card[id]') !== null ||
+          document.querySelector('p.results') !== null ||
+          document.querySelector('.booking-calendar__cards') !== null
+        );
+      }).catch(() => false);
 
       if (!onResults) {
         logger.warn({ ...logCtx, attempt }, 'Direct navigation redirected away from results, retrying');
@@ -445,6 +452,15 @@ async function waitForResults(page: Page, logCtx: LogCtx = {}): Promise<boolean>
     if ((await page.locator('.booking-calendar__cards').count().catch(() => 0)) > 0) {
       logger.debug('Results ready, booking-calendar visible');
       return true;
+    }
+    // Detect empty-cart state: Azul renders "Informar viajantes" when the SPA has
+    // no session and falls back to the booking wizard instead of flight results.
+    const emptyCart = await page.evaluate(() =>
+      /informar viajantes/i.test(document.body?.innerText ?? ''),
+    ).catch(() => false);
+    if (emptyCart) {
+      logger.warn({ ...logCtx }, 'Azul empty-cart state detected — session missing, falling back to form fill');
+      return false;
     }
     await page.waitForTimeout(500);
   }
