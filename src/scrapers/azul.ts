@@ -139,17 +139,17 @@ async function searchRoute(
       for (let attempt = 1; attempt <= 2; attempt++) {
         if (attempt > 1) {
           logger.info({ ...logCtx, origin, destination }, 'API error — waiting 90s before retry');
-          await new Promise(r => setTimeout(r, 90_000));
+          await new Promise(r => setTimeout(r, 120_000));
         }
         logger.info({ ...logCtx, origin, destination, attempt }, 'Falling back to form fill');
         await page.goto(AZUL_HOME, { waitUntil: 'load', timeout: 60_000 });
-        await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
-        await humanDelay(2_000, 3_500);
+        await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
+        await humanDelay(3_000, 5_000);
         await waitForEvalReady(page);
         await checkForBlock(page);
         await acceptCookies(page);
-        await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
-        await humanDelay(800, 1_200);
+        await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+        await humanDelay(1_500, 3_000);
         await hideOnetrust(page);
         await waitForSearchForm(page, logCtx);
         await saveSnapshot(page, params.runDir, `${origin}-${destination}-home`);
@@ -172,7 +172,7 @@ async function searchRoute(
       const date = dates[i]!;
 
       if (i > 0) {
-        await humanDelay(4_000, 8_000);
+        await humanDelay(6_000, 12_000);
       }
 
       if (i === 0) {
@@ -273,8 +273,8 @@ async function tryDirectNavigation(
     logger.debug({ attempt, origin, destination, date }, 'Trying direct URL navigation');
     try {
       await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
-      await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
-      await humanDelay(500, 1_000);
+      await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+      await humanDelay(1_500, 2_500);
       await waitForEvalReady(page);
       await checkForBlock(page);
       await acceptCookies(page);
@@ -292,7 +292,7 @@ async function tryDirectNavigation(
 
       if (!onResults) {
         logger.warn({ ...logCtx, attempt }, 'Direct navigation redirected away from results, retrying');
-        if (attempt < 3) await humanDelay(2_000, 3_000);
+        if (attempt < 3) await humanDelay(4_000, 6_000);
         continue;
       }
 
@@ -300,7 +300,7 @@ async function tryDirectNavigation(
       return true;
     } catch (err) {
       logger.warn({ ...logCtx, attempt, err: String(err).slice(0, 120) }, 'Direct URL navigation attempt failed');
-      if (attempt < 3) await humanDelay(2_000, 3_000);
+      if (attempt < 3) await humanDelay(4_000, 6_000);
     }
   }
 
@@ -337,7 +337,7 @@ async function waitForSearchForm(page: Page, logCtx: LogCtx = {}): Promise<void>
   await page
     .locator('input[aria-label*="Origem" i]')
     .first()
-    .waitFor({ state: 'attached', timeout: 20_000 })
+    .waitFor({ state: 'attached', timeout: 30_000 })
     .catch(() => logger.warn({ ...logCtx }, 'Search form attach timeout, proceeding'));
 }
 
@@ -486,7 +486,7 @@ async function setPassengers(page: Page, count: number): Promise<void> {
 // When returning false due to API error, the "Ok, entendi" modal is intentionally
 // left open so the caller can detect it and decide whether to retry.
 async function waitForResults(page: Page, logCtx: LogCtx = {}): Promise<boolean> {
-  const deadline = Date.now() + 25_000;
+  const deadline = Date.now() + 35_000;
 
   while (Date.now() < deadline) {
     if ((await page.locator('p.results').count().catch(() => 0)) > 0) {
