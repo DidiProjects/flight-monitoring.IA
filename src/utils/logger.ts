@@ -33,7 +33,7 @@ function buildTransport(): pino.TransportSingleOptions | pino.TransportMultiOpti
         labels: { app: 'scraping-api', env: process.env['NODE_ENV'] ?? 'production' },
         interval: 5,
         replaceTimestamp: true,
-        silenceErrors: true,
+        silenceErrors: false,
       },
       level: 'info',
     });
