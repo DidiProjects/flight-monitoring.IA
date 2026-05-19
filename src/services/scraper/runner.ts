@@ -11,7 +11,7 @@ import type { FlightOffer } from '../../types/index.ts';
 
 // Minimum gap between consecutive Azul jobs — Akamai WAF flags the IP
 // when multiple automated sessions hit in quick succession from the same origin.
-const AZUL_MIN_GAP_MS = 45_000;
+const AZUL_MIN_GAP_MS = 180_000;
 let lastAzulRunAt = 0;
 
 function categorizeError(err: unknown): string {

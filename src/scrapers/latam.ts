@@ -1,5 +1,5 @@
 import { firefox } from 'playwright';
-import type { Browser, Page } from 'playwright';
+import type { Browser, BrowserContext, Cookie, Page } from 'playwright';
 import { launchOptions as camoufoxLaunchOptions } from 'camoufox-js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -13,6 +13,24 @@ import type { FlightOffer, FlightFares, ScraperParams } from '../types/index.ts'
 type LogCtx = { requestId?: string; routineId?: string; airline?: string };
 
 const SEARCH_URL = 'https://www.latamairlines.com/br/pt/oferta-voos';
+const SESSION_FILE = path.join(process.cwd(), '.sessions', 'latam-cookies.json');
+
+async function loadSavedCookies(): Promise<Cookie[]> {
+  try {
+    const raw = await fs.readFile(SESSION_FILE, 'utf-8');
+    const cookies: Cookie[] = JSON.parse(raw);
+    const nowSec = Date.now() / 1000;
+    return cookies.filter(c => !c.expires || c.expires === -1 || c.expires > nowSec);
+  } catch { return []; }
+}
+
+async function saveSessionCookies(context: BrowserContext): Promise<void> {
+  try {
+    const cookies = await context.cookies();
+    await fs.mkdir(path.dirname(SESSION_FILE), { recursive: true });
+    await fs.writeFile(SESSION_FILE, JSON.stringify(cookies, null, 2));
+  } catch {}
+}
 
 function buildSearchUrl(
   origin: string,
@@ -65,19 +83,20 @@ export async function searchFlights(params: ScraperParams, cpf?: string, passwor
   });
   const browser = await firefox.launch(foxOptions);
   const allOffers: FlightOffer[] = [];
+  const savedCookies = await loadSavedCookies();
 
   try {
     // BRL outbound
     const brlOut = await searchDateRange(browser, params.origin, params.destination,
       params.outboundStart, params.outboundEnd ?? params.outboundStart,
-      false, false, params);
+      false, false, params, savedCookies);
     allOffers.push(...brlOut);
 
     // BRL return
     if (params.returnStart) {
       const brlRet = await searchDateRange(browser, params.destination, params.origin,
         params.returnStart, params.returnEnd ?? params.returnStart,
-        false, true, params);
+        false, true, params, savedCookies);
       allOffers.push(...brlRet);
     }
 
@@ -85,13 +104,13 @@ export async function searchFlights(params: ScraperParams, cpf?: string, passwor
     if (cpf && password) {
       const ptsOut = await searchDateRange(browser, params.origin, params.destination,
         params.outboundStart, params.outboundEnd ?? params.outboundStart,
-        true, false, params, cpf, password);
+        true, false, params, savedCookies, cpf, password);
       mergePoints(allOffers, ptsOut);
 
       if (params.returnStart) {
         const ptsRet = await searchDateRange(browser, params.destination, params.origin,
           params.returnStart, params.returnEnd ?? params.returnStart,
-          true, true, params, cpf, password);
+          true, true, params, savedCookies, cpf, password);
         mergePoints(allOffers, ptsRet);
       }
     }
@@ -113,11 +132,18 @@ async function searchDateRange(
   redemption: boolean,
   isReturn: boolean,
   params: ScraperParams,
+  savedCookies: Cookie[] = [],
   cpf?: string,
   password?: string,
 ): Promise<FlightOffer[]> {
   const logCtx: LogCtx = { requestId: params.requestId, routineId: params.routineId, airline: params.airline };
   const context = await browser.newContext(contextOptions);
+
+  if (savedCookies.length > 0) {
+    await context.addCookies(savedCookies);
+    logger.debug({ count: savedCookies.length }, 'LATAM: session cookies restored');
+  }
+
   const page = await context.newPage();
 
   await page.route('**/*', route => {
@@ -135,8 +161,8 @@ async function searchDateRange(
       logger.info({ origin, destination, date, redemption }, 'Navigating to LATAM search');
 
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-      await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
-      await humanDelay(1_000, 2_000);
+      await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
+      await humanDelay(2_000, 4_000);
 
       if (!cookiesAccepted) {
         cookiesAccepted = await acceptCookies(page);
@@ -152,8 +178,8 @@ async function searchDateRange(
         }
         // Re-navigate to search URL after login
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-        await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
-        await humanDelay(1_000, 2_000);
+        await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
+        await humanDelay(2_000, 4_000);
       }
 
       const hasCards = await waitForCards(page, logCtx);
@@ -190,6 +216,7 @@ async function searchDateRange(
       .catch(() => {});
     throw err;
   } finally {
+    await saveSessionCookies(context);
     await context.close();
   }
 
@@ -330,7 +357,7 @@ async function latamLogin(page: Page, cpf: string, password: string, logCtx: Log
 // ── Wait for cards ─────────────────────────────────────────────────────────────
 
 async function waitForCards(page: Page, logCtx: LogCtx = {}): Promise<boolean> {
-  const deadline = Date.now() + 90_000;
+  const deadline = Date.now() + 120_000;
 
   while (Date.now() < deadline) {
     const hasCard = await page.locator('[data-testid="wrapper-card-header-0"]')
@@ -555,11 +582,12 @@ async function saveSnapshot(page: Page, runDir: string | undefined, label: strin
   if (!runDir) return;
   const snapDir = path.join(runDir, 'snapshots');
   await fs.mkdir(snapDir, { recursive: true }).catch(() => {});
-  try {
-    const html = await page.evaluate(() => document.documentElement.outerHTML);
-    await fs.writeFile(path.join(snapDir, `${label}.html`), html);
-    logger.debug({ label }, 'Snapshot saved');
-  } catch {
-    logger.debug({ label }, 'Snapshot save failed');
-  }
+  await Promise.all([
+    page.evaluate(() => document.documentElement.outerHTML)
+      .then(html => fs.writeFile(path.join(snapDir, `${label}.html`), html))
+      .catch(() => {}),
+    page.screenshot({ path: path.join(snapDir, `${label}.png`), fullPage: false })
+      .catch(() => {}),
+  ]);
+  logger.debug({ label }, 'Snapshot saved');
 }
