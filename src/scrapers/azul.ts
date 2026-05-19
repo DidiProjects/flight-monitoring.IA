@@ -88,17 +88,11 @@ async function searchRoute(
   try {
     logger.info({ ...logCtx, origin, destination, startDate, endDate }, 'Opening search page');
 
-    // ── Primary path: direct URL navigation (up to 3 attempts) ───────────────
+    // ── First date: always use form fill ─────────────────────────────────────
+    // Fresh browser contexts have no Azul session cookie, so direct URL navigation
+    // lands on an empty-cart state. Form fill always creates a session correctly.
     let firstLoaded = false;
-    const directOk = await tryDirectNavigation(page, origin, destination, startDate, params.passengers, logCtx);
-
-    if (directOk) {
-      firstLoaded = await waitForResults(page, logCtx);
-      await saveSnapshot(page, params.runDir, `${origin}-${destination}-${startDate}-results`);
-    } else {
-      // ── Fallback: home page + form fill ───────────────────────────────────
-      logger.info({ ...logCtx, origin, destination }, 'Direct URL failed, falling back to form fill');
-
+    {
       await page.goto(AZUL_HOME, { waitUntil: 'load', timeout: 60_000 });
       await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
       await humanDelay(2_000, 3_500);
@@ -229,19 +223,14 @@ async function tryDirectNavigation(
       await hideOnetrust(page);
 
       // Verify we landed on the results page, not silently redirected to home.
-      // NOTE: checking the URL alone is not enough — when Azul's SPA has no session
-      // state it stays on selecao-voo but renders an empty-cart view ("Informar
-      // viajantes"). That false-positive is filtered out by the isEmptyCart guard.
-      const onResults = await page.evaluate(() => {
-        const bodyText = document.body?.innerText ?? '';
-        const isEmptyCart = /informar viajantes/i.test(bodyText);
-        return (
-          (window.location.pathname.includes('selecao-voo') && !isEmptyCart) ||
-          document.querySelector('div.flight-card[id]') !== null ||
-          document.querySelector('p.results') !== null ||
-          document.querySelector('.booking-calendar__cards') !== null
-        );
-      }).catch(() => false);
+      // For i>0 dates, the session cookie already exists from the form fill on the
+      // first date, so direct URL navigation lands on the real results page.
+      const onResults = await page.evaluate(() =>
+        window.location.pathname.includes('selecao-voo') ||
+        document.querySelector('div.flight-card[id]') !== null ||
+        document.querySelector('p.results') !== null ||
+        document.querySelector('.booking-calendar__cards') !== null,
+      ).catch(() => false);
 
       if (!onResults) {
         logger.warn({ ...logCtx, attempt }, 'Direct navigation redirected away from results, retrying');
@@ -452,15 +441,6 @@ async function waitForResults(page: Page, logCtx: LogCtx = {}): Promise<boolean>
     if ((await page.locator('.booking-calendar__cards').count().catch(() => 0)) > 0) {
       logger.debug('Results ready, booking-calendar visible');
       return true;
-    }
-    // Detect empty-cart state: Azul renders "Informar viajantes" when the SPA has
-    // no session and falls back to the booking wizard instead of flight results.
-    const emptyCart = await page.evaluate(() =>
-      /informar viajantes/i.test(document.body?.innerText ?? ''),
-    ).catch(() => false);
-    if (emptyCart) {
-      logger.warn({ ...logCtx }, 'Azul empty-cart state detected — session missing, falling back to form fill');
-      return false;
     }
     await page.waitForTimeout(500);
   }
@@ -730,11 +710,12 @@ async function saveSnapshot(page: Page, runDir: string | undefined, label: strin
   if (!runDir) return;
   const snapDir = path.join(runDir, 'snapshots');
   await fs.mkdir(snapDir, { recursive: true }).catch(() => {});
-  try {
-    const html = await page.evaluate(() => document.documentElement.outerHTML);
-    await fs.writeFile(path.join(snapDir, `${label}.html`), html);
-    logger.debug({ label }, 'Snapshot saved');
-  } catch {
-    logger.debug({ label }, 'Snapshot save failed');
-  }
+  await Promise.all([
+    page.evaluate(() => document.documentElement.outerHTML)
+      .then(html => fs.writeFile(path.join(snapDir, `${label}.html`), html))
+      .catch(() => {}),
+    page.screenshot({ path: path.join(snapDir, `${label}.png`), fullPage: false })
+      .catch(() => {}),
+  ]);
+  logger.debug({ label }, 'Snapshot saved');
 }
