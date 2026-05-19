@@ -88,39 +88,46 @@ async function searchRoute(
   try {
     logger.info({ ...logCtx, origin, destination, startDate, endDate }, 'Opening search page');
 
-    // ── First date: form fill with retry on API error ─────────────────────────
-    // Fresh browser contexts have no Azul session cookie, so direct URL navigation
-    // lands on an empty-cart state. Form fill always creates a session correctly.
-    // If Azul's API returns an error modal on the first attempt, wait 90s and retry once.
+    // ── Primary: direct URL → Fallback: form fill (with retry on API error) ────
     let firstLoaded = false;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      if (attempt > 1) {
-        logger.info({ ...logCtx, origin, destination }, 'API error on first attempt — waiting 90s before retry');
-        await new Promise(r => setTimeout(r, 90_000));
-      }
-      await page.goto(AZUL_HOME, { waitUntil: 'load', timeout: 60_000 });
-      await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
-      await humanDelay(2_000, 3_500);
-      await waitForEvalReady(page);
-      await checkForBlock(page);
-      await acceptCookies(page);
-      await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
-      await humanDelay(800, 1_200);
-      await hideOnetrust(page);
-      await waitForSearchForm(page, logCtx);
-      logger.debug({ attempt }, 'Form ready');
-      await saveSnapshot(page, params.runDir, `${origin}-${destination}-home`);
-      await fillSearchForm(page, origin, destination, startDate, params.passengers, logCtx);
+    const directOk = await tryDirectNavigation(page, origin, destination, startDate, params.passengers, logCtx);
+
+    if (directOk) {
       firstLoaded = await waitForResults(page, logCtx);
       await saveSnapshot(page, params.runDir, `${origin}-${destination}-${startDate}-results`);
+    }
 
-      if (firstLoaded) break;
+    if (!directOk || !firstLoaded) {
+      // Fallback: form fill — also used as retry when direct URL returns API error
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        if (attempt > 1) {
+          logger.info({ ...logCtx, origin, destination }, 'API error — waiting 90s before retry');
+          await new Promise(r => setTimeout(r, 90_000));
+        }
+        logger.info({ ...logCtx, origin, destination, attempt }, 'Falling back to form fill');
+        await page.goto(AZUL_HOME, { waitUntil: 'load', timeout: 60_000 });
+        await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
+        await humanDelay(2_000, 3_500);
+        await waitForEvalReady(page);
+        await checkForBlock(page);
+        await acceptCookies(page);
+        await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+        await humanDelay(800, 1_200);
+        await hideOnetrust(page);
+        await waitForSearchForm(page, logCtx);
+        await saveSnapshot(page, params.runDir, `${origin}-${destination}-home`);
+        await fillSearchForm(page, origin, destination, startDate, params.passengers, logCtx);
+        firstLoaded = await waitForResults(page, logCtx);
+        await saveSnapshot(page, params.runDir, `${origin}-${destination}-${startDate}-results`);
 
-      // Check if failure was an API error modal (retryable) or genuine no-flights
-      const isApiError = (await page.locator('button:text("Ok, entendi")').count().catch(() => 0)) > 0;
-      if (!isApiError) break; // no flights for this date, no point retrying
-      await page.locator('button:text("Ok, entendi")').first().click({ timeout: 3_000 }).catch(() => {});
-      logger.warn({ ...logCtx, attempt }, 'Dismissed API error modal, will retry');
+        if (firstLoaded) break;
+
+        // Only retry if it was an API error modal (retryable), not genuine no-flights
+        const isApiError = (await page.locator('button:text("Ok, entendi")').count().catch(() => 0)) > 0;
+        if (!isApiError) break;
+        await page.locator('button:text("Ok, entendi")').first().click({ timeout: 3_000 }).catch(() => {});
+        logger.warn({ ...logCtx, attempt }, 'Dismissed API error modal, will retry');
+      }
     }
     const dates = [...dateRange(startDate, endDate)];
 
