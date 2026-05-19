@@ -9,11 +9,12 @@ export const contextOptions: BrowserContextOptions = {
   },
 };
 
-/** Resource types to abort, speeds up the scraper significantly */
+/** Resource types to abort.
+ *  Blocking images/fonts is a detectable bot signal — Akamai inspects which
+ *  resource types are requested. Only block media (video/audio) which is never
+ *  relevant to flight search and has no fingerprinting role. */
 export const BLOCKED_RESOURCES = new Set([
-  'image',
   'media',
-  'font',
 ]);
 
 /** URL patterns whose responses we want to capture as flight data */

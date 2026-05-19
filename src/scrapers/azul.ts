@@ -1,5 +1,5 @@
 import { firefox } from 'playwright';
-import type { Browser, Page } from 'playwright';
+import type { Browser, BrowserContext, Cookie, Page } from 'playwright';
 import { launchOptions as camoufoxLaunchOptions } from 'camoufox-js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -19,6 +19,34 @@ type LogCtx = { requestId?: string; routineId?: string; airline?: string };
 const AZUL_HOME    = 'https://www.voeazul.com.br/br/pt/home';
 const AZUL_RESULTS = 'https://www.voeazul.com.br/br/pt/home/selecao-voo';
 
+// ── Session persistence ───────────────────────────────────────────────────────
+
+const SESSION_FILE = path.join(process.cwd(), '.sessions', 'azul-cookies.json');
+
+async function loadSavedCookies(): Promise<Cookie[]> {
+  try {
+    const raw = await fs.readFile(SESSION_FILE, 'utf-8');
+    const cookies: Cookie[] = JSON.parse(raw);
+    const nowSec = Date.now() / 1000;
+    const valid = cookies.filter(c => !c.expires || c.expires === -1 || c.expires > nowSec);
+    logger.debug({ total: cookies.length, valid: valid.length }, 'Loaded Azul session cookies');
+    return valid;
+  } catch {
+    return [];
+  }
+}
+
+async function saveSessionCookies(context: BrowserContext): Promise<void> {
+  try {
+    const cookies = await context.cookies();
+    await fs.mkdir(path.dirname(SESSION_FILE), { recursive: true });
+    await fs.writeFile(SESSION_FILE, JSON.stringify(cookies, null, 2));
+    logger.debug({ count: cookies.length }, 'Saved Azul session cookies');
+  } catch {
+    // non-critical
+  }
+}
+
 // Builds the direct deep-link URL for a flight search
 // date: "YYYY-MM-DD", currency: "BRL" | "PTS"
 function buildSearchUrl(origin: string, destination: string, date: string, currency: 'BRL' | 'PTS', passengers: number): string {
@@ -31,7 +59,7 @@ function buildSearchUrl(origin: string, destination: string, date: string, curre
 
 export async function searchFlights(params: ScraperParams): Promise<FlightOffer[]> {
   const foxOptions = await camoufoxLaunchOptions({
-    headless: false,
+    headless: true,
     os: 'windows',
     locale: 'pt-BR',
     humanize: true,
@@ -39,11 +67,13 @@ export async function searchFlights(params: ScraperParams): Promise<FlightOffer[
   const browser = await firefox.launch(foxOptions);
   const results: FlightOffer[] = [];
 
+  const savedCookies = await loadSavedCookies();
+
   try {
     const outbound = await searchRoute(
       browser, params.origin, params.destination,
       params.outboundStart, params.outboundEnd ?? params.outboundStart,
-      params, false,
+      params, false, savedCookies,
     );
     results.push(...outbound);
 
@@ -52,7 +82,7 @@ export async function searchFlights(params: ScraperParams): Promise<FlightOffer[
       const ret = await searchRoute(
         browser, params.destination, params.origin,
         params.returnStart, params.returnEnd ?? params.returnStart,
-        params, true,
+        params, true, savedCookies,
       );
       results.push(...ret);
     }
@@ -73,8 +103,15 @@ async function searchRoute(
   endDate: string,
   params: ScraperParams,
   isReturn: boolean,
+  savedCookies: Cookie[] = [],
 ): Promise<FlightOffer[]> {
   const context = await browser.newContext(contextOptions);
+
+  if (savedCookies.length > 0) {
+    await context.addCookies(savedCookies);
+    logger.debug({ count: savedCookies.length }, 'Injected persisted Azul session cookies');
+  }
+
   const page = await context.newPage();
 
   await page.route('**/*', route => {
@@ -195,6 +232,7 @@ async function searchRoute(
       .catch(() => {});
     throw err;
   } finally {
+    await saveSessionCookies(context);
     await context.close();
   }
 

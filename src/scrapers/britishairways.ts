@@ -90,7 +90,7 @@ function parseDurationMinOld(text: string): number {
 
 export async function searchFlights(params: ScraperParams): Promise<FlightOffer[]> {
   const foxOptions = await camoufoxLaunchOptions({
-    headless: false,
+    headless: true,
     os: 'windows',
     locale: 'en-GB',
     humanize: true,
