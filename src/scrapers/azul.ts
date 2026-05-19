@@ -48,6 +48,7 @@ export async function searchFlights(params: ScraperParams): Promise<FlightOffer[
     results.push(...outbound);
 
     if (params.returnStart) {
+      await humanDelay(5_000, 10_000);
       const ret = await searchRoute(
         browser, params.destination, params.origin,
         params.returnStart, params.returnEnd ?? params.returnStart,
@@ -118,6 +119,10 @@ async function searchRoute(
 
     for (let i = 0; i < dates.length; i++) {
       const date = dates[i]!;
+
+      if (i > 0) {
+        await humanDelay(4_000, 8_000);
+      }
 
       if (i === 0) {
         // First date already loaded by tryDirectNavigation (or form fill)

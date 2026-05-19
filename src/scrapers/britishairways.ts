@@ -153,7 +153,7 @@ async function searchDateRange(
       const url = buildSearchUrl(origin, destination, date, params.passengers);
       logger.info({ origin, destination, date }, 'Navigating to BA search');
 
-      await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
       await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
       await humanDelay(1_500, 2_500);
       await dismissCookieBanner(page);

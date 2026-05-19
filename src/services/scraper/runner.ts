@@ -9,6 +9,11 @@ import { env } from '../../config/env.ts';
 import type { ScrapeRequest, ScrapeResult } from '../../types/scrape.ts';
 import type { FlightOffer } from '../../types/index.ts';
 
+// Minimum gap between consecutive Azul jobs — Akamai WAF flags the IP
+// when multiple automated sessions hit in quick succession from the same origin.
+const AZUL_MIN_GAP_MS = 45_000;
+let lastAzulRunAt = 0;
+
 function categorizeError(err: unknown): string {
   const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
   if (msg.includes('comportamento incomum') || msg.includes('acesso foi limitado') || msg.includes('bot')) return 'bot_detection';
@@ -51,6 +56,13 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
 
     const airline = request.airline.toLowerCase();
     if (airline === 'azul') {
+      const gap = Date.now() - lastAzulRunAt;
+      if (lastAzulRunAt > 0 && gap < AZUL_MIN_GAP_MS) {
+        const wait = AZUL_MIN_GAP_MS - gap;
+        logger.info({ ...logCtx, waitMs: wait }, 'Azul cooldown: waiting between consecutive runs');
+        await new Promise(r => setTimeout(r, wait));
+      }
+      lastAzulRunAt = Date.now();
       flights = await azulSearch(scraperParams);
     } else if (airline === 'latam') {
       flights = await latamSearch(scraperParams);
