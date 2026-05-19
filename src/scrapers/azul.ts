@@ -78,7 +78,7 @@ export async function searchFlights(params: ScraperParams): Promise<FlightOffer[
     results.push(...outbound);
 
     if (params.returnStart) {
-      await humanDelay(5_000, 10_000);
+      await humanDelay(8_000, 15_000);
       const ret = await searchRoute(
         browser, params.destination, params.origin,
         params.returnStart, params.returnEnd ?? params.returnStart,
