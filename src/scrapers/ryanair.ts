@@ -73,7 +73,7 @@ function normalizeFlightNumber(raw: string): string {
 
 export async function searchFlights(params: ScraperParams): Promise<FlightOffer[]> {
   const foxOptions = await camoufoxLaunchOptions({
-    headless: true,
+    headless: false,
     os: 'windows',
     locale: 'en-GB',
     humanize: true,

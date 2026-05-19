@@ -58,7 +58,7 @@ function parseStops(text: string): number {
 
 export async function searchFlights(params: ScraperParams, cpf?: string, password?: string): Promise<FlightOffer[]> {
   const foxOptions = await camoufoxLaunchOptions({
-    headless: true,
+    headless: false,
     os: 'windows',
     locale: 'pt-BR',
     humanize: true,
