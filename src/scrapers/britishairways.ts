@@ -225,7 +225,7 @@ async function waitForCards(page: Page, logCtx: LogCtx = {}): Promise<boolean> {
     if (hasOldCard) return true;
 
     const noFlights = await page.evaluate(() =>
-      /no flights|no results|0 flights/i.test(document.body.innerText),
+      /no flights|no results|unavailable|0 flights/i.test(document.body.innerText),
     ).catch(() => false);
     if (noFlights) return false;
 
