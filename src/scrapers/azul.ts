@@ -138,7 +138,7 @@ async function searchRoute(
       // Fallback: form fill — also used as retry when direct URL returns API error
       for (let attempt = 1; attempt <= 2; attempt++) {
         if (attempt > 1) {
-          logger.info({ ...logCtx, origin, destination }, 'API error — waiting 90s before retry');
+          logger.info({ ...logCtx, origin, destination }, 'API error — waiting 120s before retry');
           await new Promise(r => setTimeout(r, 120_000));
         }
         logger.info({ ...logCtx, origin, destination, attempt }, 'Falling back to form fill');
