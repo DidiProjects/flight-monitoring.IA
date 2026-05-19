@@ -88,11 +88,16 @@ async function searchRoute(
   try {
     logger.info({ ...logCtx, origin, destination, startDate, endDate }, 'Opening search page');
 
-    // ── First date: always use form fill ─────────────────────────────────────
+    // ── First date: form fill with retry on API error ─────────────────────────
     // Fresh browser contexts have no Azul session cookie, so direct URL navigation
     // lands on an empty-cart state. Form fill always creates a session correctly.
+    // If Azul's API returns an error modal on the first attempt, wait 90s and retry once.
     let firstLoaded = false;
-    {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      if (attempt > 1) {
+        logger.info({ ...logCtx, origin, destination }, 'API error on first attempt — waiting 90s before retry');
+        await new Promise(r => setTimeout(r, 90_000));
+      }
       await page.goto(AZUL_HOME, { waitUntil: 'load', timeout: 60_000 });
       await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
       await humanDelay(2_000, 3_500);
@@ -103,11 +108,19 @@ async function searchRoute(
       await humanDelay(800, 1_200);
       await hideOnetrust(page);
       await waitForSearchForm(page, logCtx);
-      logger.debug('Form ready');
+      logger.debug({ attempt }, 'Form ready');
       await saveSnapshot(page, params.runDir, `${origin}-${destination}-home`);
       await fillSearchForm(page, origin, destination, startDate, params.passengers, logCtx);
       firstLoaded = await waitForResults(page, logCtx);
       await saveSnapshot(page, params.runDir, `${origin}-${destination}-${startDate}-results`);
+
+      if (firstLoaded) break;
+
+      // Check if failure was an API error modal (retryable) or genuine no-flights
+      const isApiError = (await page.locator('button:text("Ok, entendi")').count().catch(() => 0)) > 0;
+      if (!isApiError) break; // no flights for this date, no point retrying
+      await page.locator('button:text("Ok, entendi")').first().click({ timeout: 3_000 }).catch(() => {});
+      logger.warn({ ...logCtx, attempt }, 'Dismissed API error modal, will retry');
     }
     const dates = [...dateRange(startDate, endDate)];
 
@@ -424,8 +437,9 @@ async function setPassengers(page: Page, count: number): Promise<void> {
 
 // ── Wait for results ──────────────────────────────────────────────────────────
 
-// Returns true if results loaded, false if empty-state (no flights available).
-// Uses locator polling, avoids page.waitForFunction serialization issues with tsx.
+// Returns true if results loaded, false if empty-state or API error.
+// When returning false due to API error, the "Ok, entendi" modal is intentionally
+// left open so the caller can detect it and decide whether to retry.
 async function waitForResults(page: Page, logCtx: LogCtx = {}): Promise<boolean> {
   const deadline = Date.now() + 25_000;
 
@@ -441,6 +455,11 @@ async function waitForResults(page: Page, logCtx: LogCtx = {}): Promise<boolean>
     if ((await page.locator('.booking-calendar__cards').count().catch(() => 0)) > 0) {
       logger.debug('Results ready, booking-calendar visible');
       return true;
+    }
+    // Azul API error modal — leave it open so the caller can detect + retry
+    if ((await page.locator('button:text("Ok, entendi")').count().catch(() => 0)) > 0) {
+      logger.warn({ ...logCtx }, 'Azul API error modal detected');
+      return false;
     }
     await page.waitForTimeout(500);
   }
