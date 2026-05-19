@@ -7,3 +7,4 @@ authorization-code*.json
 .env.example
 /results/**
 !/results/**/state.json
+.sessions
