@@ -27,6 +27,7 @@ export function buildCallbackPayload(result: ScrapeResult) {
   return {
     requestId:   result.requestId,
     routineId:   result.routineId,
+    airline:     result.airline,
     origin:      result.origin,
     destination: result.destination,
     flights:     result.flights.map(toCallbackOffer),
