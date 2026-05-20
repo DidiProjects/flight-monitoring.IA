@@ -25,7 +25,22 @@
       "Bash(dir \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\flight-monitoring.IA\\\\scripts\\\\grafana\\\\node_modules\\\\@grafana\\\\grafana-foundation-sdk\\\\dist\")",
       "Bash(findstr /i \"stat bar\")",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\flight-monitoring.IA\\\\scripts\\\\grafana\\\\node_modules\\\\@grafana\\\\grafana-foundation-sdk\\\\dist\" | Where-Object { $_.Name -match \"stat|bar\" } | Select-Object Name)",
-      "Bash(node -e \"const j=JSON.parse\\(require\\('fs'\\).readFileSync\\('grafana-flight-monitoring.json'\\)\\); j.panels.forEach\\(p => console.log\\(p.type.padEnd\\(12\\), JSON.stringify\\(p.gridPos\\), \\(p.title||''\\).substring\\(0,40\\)\\)\\)\")"
+      "Bash(node -e \"const j=JSON.parse\\(require\\('fs'\\).readFileSync\\('grafana-flight-monitoring.json'\\)\\); j.panels.forEach\\(p => console.log\\(p.type.padEnd\\(12\\), JSON.stringify\\(p.gridPos\\), \\(p.title||''\\).substring\\(0,40\\)\\)\\)\")",
+      "Bash([ -f \"$dir/response.json\" ])",
+      "Bash([ -d \"$dir/errors\" ])",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\\\\scraping-result\" -Recurse -Name | Where-Object { $_ -match \"errors|\\\\.png\" })",
+      "Read(//mnt/c/Users/diego/Documents/projects/**)",
+      "Bash(npx tsc *)",
+      "PowerShell(& npx --prefix \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\" tsc --noEmit --project \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\\\\tsconfig.json\" 2>&1 | Select-Object -First 20)",
+      "Bash(git *)",
+      "Skill(update-config)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\\\\scraping-result\" -Recurse | Where-Object { !$_.PSIsContainer } | Select-Object FullName, LastWriteTime | Sort-Object LastWriteTime -Descending | Select-Object -First 60)",
+      "PowerShell(& npx --prefix \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\" tsc --noEmit --project \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\\\\tsconfig.json\" 2>&1 | Select-Object -First 10)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\\\\scraping-result\\\\2026-05-19T10-54-58_8692bbbc_CNF-GRU\" -Recurse -Force | ForEach-Object { $_.FullName })",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\\\\scraping-result\" -Directory | Sort-Object LastWriteTime -Descending | ForEach-Object { \"$\\($_.LastWriteTime\\) - $\\($_.Name\\)\" })",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\\\\scraping-result\\\\2026-05-19T11-30-20_fe1f27f6_CNF-GRU\" -Recurse -Force | ForEach-Object { \"$\\($_.Length.ToString\\(\\).PadLeft\\(8\\)\\) $\\($_.FullName.Replace\\('C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\\\\scraping-result\\\\2026-05-19T11-30-20_fe1f27f6_CNF-GRU\\\\', ''\\)\\)\" })",
+      "Bash(dir \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\flight.FRONT\\\\src\" /s /b)",
+      "Bash(findstr /v node_modules)"
     ]
   }
 }
