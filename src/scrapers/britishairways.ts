@@ -1,5 +1,5 @@
 import { firefox } from 'playwright';
-import type { Browser, Page } from 'playwright';
+import type { Browser, BrowserContext, Cookie, Page } from 'playwright';
 import { launchOptions as camoufoxLaunchOptions } from 'camoufox-js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -13,6 +13,24 @@ import type { FlightOffer, FlightFares, ScraperParams } from '../types/index.ts'
 type LogCtx = { requestId?: string; routineId?: string; airline?: string };
 
 const SEARCH_BASE = 'https://www.britishairways.com/nx/b/airselect/en/gbr/book/search/';
+const SESSION_FILE = path.join(process.cwd(), '.sessions', 'ba-cookies.json');
+
+async function loadSavedCookies(): Promise<Cookie[]> {
+  try {
+    const raw = await fs.readFile(SESSION_FILE, 'utf-8');
+    const cookies: Cookie[] = JSON.parse(raw);
+    const nowSec = Date.now() / 1000;
+    return cookies.filter(c => !c.expires || c.expires === -1 || c.expires > nowSec);
+  } catch { return []; }
+}
+
+async function saveSessionCookies(context: BrowserContext): Promise<void> {
+  try {
+    const cookies = await context.cookies();
+    await fs.mkdir(path.dirname(SESSION_FILE), { recursive: true });
+    await fs.writeFile(SESSION_FILE, JSON.stringify(cookies, null, 2));
+  } catch {}
+}
 
 function buildSearchUrl(
   origin: string,
@@ -90,19 +108,20 @@ function parseDurationMinOld(text: string): number {
 
 export async function searchFlights(params: ScraperParams): Promise<FlightOffer[]> {
   const foxOptions = await camoufoxLaunchOptions({
-    headless: false,
+    headless: true,
     os: 'windows',
     locale: 'en-GB',
     humanize: true,
   });
   const browser = await firefox.launch(foxOptions);
   const allOffers: FlightOffer[] = [];
+  const savedCookies = await loadSavedCookies();
 
   try {
     const outbound = await searchDateRange(
       browser, params.origin, params.destination,
       params.outboundStart, params.outboundEnd ?? params.outboundStart,
-      false, params,
+      false, params, savedCookies,
     );
     allOffers.push(...outbound);
 
@@ -110,7 +129,7 @@ export async function searchFlights(params: ScraperParams): Promise<FlightOffer[
       const ret = await searchDateRange(
         browser, params.destination, params.origin,
         params.returnStart, params.returnEnd ?? params.returnStart,
-        true, params,
+        true, params, savedCookies,
       );
       allOffers.push(...ret);
     }
@@ -131,6 +150,7 @@ async function searchDateRange(
   endDate: string,
   isReturn: boolean,
   params: ScraperParams,
+  savedCookies: Cookie[] = [],
 ): Promise<FlightOffer[]> {
   const logCtx: LogCtx = { requestId: params.requestId, routineId: params.routineId, airline: params.airline };
   const context = await browser.newContext({
@@ -139,6 +159,12 @@ async function searchDateRange(
     viewport: { width: 1920, height: 1080 },
     extraHTTPHeaders: { 'Accept-Language': 'en-GB,en;q=0.9' },
   });
+
+  if (savedCookies.length > 0) {
+    await context.addCookies(savedCookies);
+    logger.debug({ count: savedCookies.length }, 'BA: session cookies restored');
+  }
+
   const page = await context.newPage();
 
   await page.route('**/*', route => {
@@ -153,9 +179,9 @@ async function searchDateRange(
       const url = buildSearchUrl(origin, destination, date, params.passengers);
       logger.info({ origin, destination, date }, 'Navigating to BA search');
 
-      await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
-      await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
-      await humanDelay(1_500, 2_500);
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
+      await humanDelay(3_000, 5_000);
       await dismissCookieBanner(page);
 
       const hasCards = await waitForCards(page, logCtx);
@@ -192,6 +218,7 @@ async function searchDateRange(
       .catch(() => {});
     throw err;
   } finally {
+    await saveSessionCookies(context);
     await context.close();
   }
 
@@ -212,7 +239,7 @@ async function dismissCookieBanner(page: Page): Promise<void> {
 // ── Wait for cards ──────────────────────────────────────────────────────────────
 
 async function waitForCards(page: Page, logCtx: LogCtx = {}): Promise<boolean> {
-  const deadline = Date.now() + 60_000;
+  const deadline = Date.now() + 90_000;
 
   while (Date.now() < deadline) {
     const hasNewCard = await page.locator('[data-ds-cr-name="Card"]')
@@ -225,7 +252,7 @@ async function waitForCards(page: Page, logCtx: LogCtx = {}): Promise<boolean> {
     if (hasOldCard) return true;
 
     const noFlights = await page.evaluate(() =>
-      /no flights|no results|0 flights/i.test(document.body.innerText),
+      /no flights|no results|unavailable|0 flights/i.test(document.body.innerText),
     ).catch(() => false);
     if (noFlights) return false;
 
@@ -438,11 +465,12 @@ async function saveSnapshot(page: Page, runDir: string | undefined, label: strin
   if (!runDir) return;
   const snapDir = path.join(runDir, 'snapshots');
   await fs.mkdir(snapDir, { recursive: true }).catch(() => {});
-  try {
-    const html = await page.evaluate(() => document.documentElement.outerHTML);
-    await fs.writeFile(path.join(snapDir, `${label}.html`), html);
-    logger.debug({ label }, 'Snapshot saved');
-  } catch {
-    logger.debug({ label }, 'Snapshot save failed');
-  }
+  await Promise.all([
+    page.evaluate(() => document.documentElement.outerHTML)
+      .then(html => fs.writeFile(path.join(snapDir, `${label}.html`), html))
+      .catch(() => {}),
+    page.screenshot({ path: path.join(snapDir, `${label}.png`), fullPage: false })
+      .catch(() => {}),
+  ]);
+  logger.debug({ label }, 'Snapshot saved');
 }

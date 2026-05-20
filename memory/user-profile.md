@@ -3,7 +3,7 @@ name: Perfil do usuário Diego
 description: Quem é o Diego e como prefere colaborar
 type: user
 ---
-Desenvolvedor que cria ferramentas de automação/scraping para uso pessoal. Confortável com TypeScript/Node.js. Prefere ver o browser aberto (headless: false) para depurar visualmente.
+Desenvolvedor que cria ferramentas de automação/scraping para uso pessoal. Confortável com TypeScript/Node.js. Prefere ver o browser aberto (headless: true) para depurar visualmente.
 
 Comunicação em português brasileiro. Respostas curtas e diretas, não precisa de explicações longas sobre o que foi feito.
 

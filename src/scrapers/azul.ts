@@ -1,5 +1,5 @@
 import { firefox } from 'playwright';
-import type { Browser, Page } from 'playwright';
+import type { Browser, BrowserContext, Cookie, Page } from 'playwright';
 import { launchOptions as camoufoxLaunchOptions } from 'camoufox-js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -18,6 +18,34 @@ type LogCtx = { requestId?: string; routineId?: string; airline?: string };
 
 const AZUL_HOME    = 'https://www.voeazul.com.br/br/pt/home';
 const AZUL_RESULTS = 'https://www.voeazul.com.br/br/pt/home/selecao-voo';
+
+// ── Session persistence ───────────────────────────────────────────────────────
+
+const SESSION_FILE = path.join(process.cwd(), '.sessions', 'azul-cookies.json');
+
+async function loadSavedCookies(): Promise<Cookie[]> {
+  try {
+    const raw = await fs.readFile(SESSION_FILE, 'utf-8');
+    const cookies: Cookie[] = JSON.parse(raw);
+    const nowSec = Date.now() / 1000;
+    const valid = cookies.filter(c => !c.expires || c.expires === -1 || c.expires > nowSec);
+    logger.debug({ total: cookies.length, valid: valid.length }, 'Loaded Azul session cookies');
+    return valid;
+  } catch {
+    return [];
+  }
+}
+
+async function saveSessionCookies(context: BrowserContext): Promise<void> {
+  try {
+    const cookies = await context.cookies();
+    await fs.mkdir(path.dirname(SESSION_FILE), { recursive: true });
+    await fs.writeFile(SESSION_FILE, JSON.stringify(cookies, null, 2));
+    logger.debug({ count: cookies.length }, 'Saved Azul session cookies');
+  } catch {
+    // non-critical
+  }
+}
 
 // Builds the direct deep-link URL for a flight search
 // date: "YYYY-MM-DD", currency: "BRL" | "PTS"
@@ -39,19 +67,22 @@ export async function searchFlights(params: ScraperParams): Promise<FlightOffer[
   const browser = await firefox.launch(foxOptions);
   const results: FlightOffer[] = [];
 
+  const savedCookies = await loadSavedCookies();
+
   try {
     const outbound = await searchRoute(
       browser, params.origin, params.destination,
       params.outboundStart, params.outboundEnd ?? params.outboundStart,
-      params, false,
+      params, false, savedCookies,
     );
     results.push(...outbound);
 
     if (params.returnStart) {
+      await humanDelay(8_000, 15_000);
       const ret = await searchRoute(
         browser, params.destination, params.origin,
         params.returnStart, params.returnEnd ?? params.returnStart,
-        params, true,
+        params, true, savedCookies,
       );
       results.push(...ret);
     }
@@ -72,8 +103,15 @@ async function searchRoute(
   endDate: string,
   params: ScraperParams,
   isReturn: boolean,
+  savedCookies: Cookie[] = [],
 ): Promise<FlightOffer[]> {
   const context = await browser.newContext(contextOptions);
+
+  if (savedCookies.length > 0) {
+    await context.addCookies(savedCookies);
+    logger.debug({ count: savedCookies.length }, 'Injected persisted Azul session cookies');
+  }
+
   const page = await context.newPage();
 
   await page.route('**/*', route => {
@@ -87,37 +125,55 @@ async function searchRoute(
   try {
     logger.info({ ...logCtx, origin, destination, startDate, endDate }, 'Opening search page');
 
-    // ── Primary path: direct URL navigation (up to 3 attempts) ───────────────
+    // ── Primary: direct URL → Fallback: form fill (with retry on API error) ────
     let firstLoaded = false;
     const directOk = await tryDirectNavigation(page, origin, destination, startDate, params.passengers, logCtx);
 
     if (directOk) {
       firstLoaded = await waitForResults(page, logCtx);
       await saveSnapshot(page, params.runDir, `${origin}-${destination}-${startDate}-results`);
-    } else {
-      // ── Fallback: home page + form fill ───────────────────────────────────
-      logger.info({ ...logCtx, origin, destination }, 'Direct URL failed, falling back to form fill');
+    }
 
-      await page.goto(AZUL_HOME, { waitUntil: 'load', timeout: 60_000 });
-      await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
-      await humanDelay(2_000, 3_500);
-      await waitForEvalReady(page);
-      await checkForBlock(page);
-      await acceptCookies(page);
-      await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
-      await humanDelay(800, 1_200);
-      await hideOnetrust(page);
-      await waitForSearchForm(page, logCtx);
-      logger.debug('Form ready');
-      await saveSnapshot(page, params.runDir, `${origin}-${destination}-home`);
-      await fillSearchForm(page, origin, destination, startDate, params.passengers, logCtx);
-      firstLoaded = await waitForResults(page, logCtx);
-      await saveSnapshot(page, params.runDir, `${origin}-${destination}-${startDate}-results`);
+    if (!directOk || !firstLoaded) {
+      // Fallback: form fill — also used as retry when direct URL returns API error
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        if (attempt > 1) {
+          logger.info({ ...logCtx, origin, destination }, 'API error — waiting 120s before retry');
+          await new Promise(r => setTimeout(r, 120_000));
+        }
+        logger.info({ ...logCtx, origin, destination, attempt }, 'Falling back to form fill');
+        await page.goto(AZUL_HOME, { waitUntil: 'load', timeout: 60_000 });
+        await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
+        await humanDelay(3_000, 5_000);
+        await waitForEvalReady(page);
+        await checkForBlock(page);
+        await acceptCookies(page);
+        await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+        await humanDelay(1_500, 3_000);
+        await hideOnetrust(page);
+        await waitForSearchForm(page, logCtx);
+        await saveSnapshot(page, params.runDir, `${origin}-${destination}-home`);
+        await fillSearchForm(page, origin, destination, startDate, params.passengers, logCtx);
+        firstLoaded = await waitForResults(page, logCtx);
+        await saveSnapshot(page, params.runDir, `${origin}-${destination}-${startDate}-results`);
+
+        if (firstLoaded) break;
+
+        // Only retry if it was an API error modal (retryable), not genuine no-flights
+        const isApiError = (await page.locator('button:text("Ok, entendi")').count().catch(() => 0)) > 0;
+        if (!isApiError) break;
+        await page.locator('button:text("Ok, entendi")').first().click({ timeout: 3_000 }).catch(() => {});
+        logger.warn({ ...logCtx, attempt }, 'Dismissed API error modal, will retry');
+      }
     }
     const dates = [...dateRange(startDate, endDate)];
 
     for (let i = 0; i < dates.length; i++) {
       const date = dates[i]!;
+
+      if (i > 0) {
+        await humanDelay(6_000, 12_000);
+      }
 
       if (i === 0) {
         // First date already loaded by tryDirectNavigation (or form fill)
@@ -176,6 +232,7 @@ async function searchRoute(
       .catch(() => {});
     throw err;
   } finally {
+    await saveSessionCookies(context);
     await context.close();
   }
 
@@ -216,24 +273,26 @@ async function tryDirectNavigation(
     logger.debug({ attempt, origin, destination, date }, 'Trying direct URL navigation');
     try {
       await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
-      await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
-      await humanDelay(500, 1_000);
+      await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+      await humanDelay(1_500, 2_500);
       await waitForEvalReady(page);
       await checkForBlock(page);
       await acceptCookies(page);
       await hideOnetrust(page);
 
-      // Verify we landed on the results page, not silently redirected to home
+      // Verify we landed on the results page, not silently redirected to home.
+      // For i>0 dates, the session cookie already exists from the form fill on the
+      // first date, so direct URL navigation lands on the real results page.
       const onResults = await page.evaluate(() =>
         window.location.pathname.includes('selecao-voo') ||
-        document.querySelector('div.flight-card') !== null ||
+        document.querySelector('div.flight-card[id]') !== null ||
         document.querySelector('p.results') !== null ||
         document.querySelector('.booking-calendar__cards') !== null,
       ).catch(() => false);
 
       if (!onResults) {
         logger.warn({ ...logCtx, attempt }, 'Direct navigation redirected away from results, retrying');
-        if (attempt < 3) await humanDelay(2_000, 3_000);
+        if (attempt < 3) await humanDelay(4_000, 6_000);
         continue;
       }
 
@@ -241,7 +300,7 @@ async function tryDirectNavigation(
       return true;
     } catch (err) {
       logger.warn({ ...logCtx, attempt, err: String(err).slice(0, 120) }, 'Direct URL navigation attempt failed');
-      if (attempt < 3) await humanDelay(2_000, 3_000);
+      if (attempt < 3) await humanDelay(4_000, 6_000);
     }
   }
 
@@ -278,7 +337,7 @@ async function waitForSearchForm(page: Page, logCtx: LogCtx = {}): Promise<void>
   await page
     .locator('input[aria-label*="Origem" i]')
     .first()
-    .waitFor({ state: 'attached', timeout: 20_000 })
+    .waitFor({ state: 'attached', timeout: 30_000 })
     .catch(() => logger.warn({ ...logCtx }, 'Search form attach timeout, proceeding'));
 }
 
@@ -423,10 +482,11 @@ async function setPassengers(page: Page, count: number): Promise<void> {
 
 // ── Wait for results ──────────────────────────────────────────────────────────
 
-// Returns true if results loaded, false if empty-state (no flights available).
-// Uses locator polling, avoids page.waitForFunction serialization issues with tsx.
+// Returns true if results loaded, false if empty-state or API error.
+// When returning false due to API error, the "Ok, entendi" modal is intentionally
+// left open so the caller can detect it and decide whether to retry.
 async function waitForResults(page: Page, logCtx: LogCtx = {}): Promise<boolean> {
-  const deadline = Date.now() + 25_000;
+  const deadline = Date.now() + 35_000;
 
   while (Date.now() < deadline) {
     if ((await page.locator('p.results').count().catch(() => 0)) > 0) {
@@ -440,6 +500,11 @@ async function waitForResults(page: Page, logCtx: LogCtx = {}): Promise<boolean>
     if ((await page.locator('.booking-calendar__cards').count().catch(() => 0)) > 0) {
       logger.debug('Results ready, booking-calendar visible');
       return true;
+    }
+    // Azul API error modal — leave it open so the caller can detect + retry
+    if ((await page.locator('button:text("Ok, entendi")').count().catch(() => 0)) > 0) {
+      logger.warn({ ...logCtx }, 'Azul API error modal detected');
+      return false;
     }
     await page.waitForTimeout(500);
   }
@@ -709,11 +774,12 @@ async function saveSnapshot(page: Page, runDir: string | undefined, label: strin
   if (!runDir) return;
   const snapDir = path.join(runDir, 'snapshots');
   await fs.mkdir(snapDir, { recursive: true }).catch(() => {});
-  try {
-    const html = await page.evaluate(() => document.documentElement.outerHTML);
-    await fs.writeFile(path.join(snapDir, `${label}.html`), html);
-    logger.debug({ label }, 'Snapshot saved');
-  } catch {
-    logger.debug({ label }, 'Snapshot save failed');
-  }
+  await Promise.all([
+    page.evaluate(() => document.documentElement.outerHTML)
+      .then(html => fs.writeFile(path.join(snapDir, `${label}.html`), html))
+      .catch(() => {}),
+    page.screenshot({ path: path.join(snapDir, `${label}.png`), fullPage: false })
+      .catch(() => {}),
+  ]);
+  logger.debug({ label }, 'Snapshot saved');
 }
