@@ -90,6 +90,6 @@ export async function pruneOldRuns(): Promise<void> {
   const entries = await fs.readdir(RESULTS_DIR).catch(() => [] as string[]);
   const sorted = entries.filter(e => /^\d{4}-\d{2}-\d{2}T/.test(e)).sort();
   for (const old of sorted.slice(0, Math.max(0, sorted.length - MAX_RUNS))) {
-    await fs.rm(path.join(RESULTS_DIR, old), { recursive: true, force: true });
+    await fs.rm(path.join(RESULTS_DIR, old), { recursive: true, force: true }).catch(() => {});
   }
 }
