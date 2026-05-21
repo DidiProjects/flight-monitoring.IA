@@ -713,6 +713,11 @@ async function collectAllFares(
                       + (horas ? parseInt(horas) * 60   : 0)
                       + (mins  ? parseInt(mins)          : 0);
 
+    if (durationMin <= 0) {
+      logger.warn({ ...logCtx, cardId: b.cardId, durLabel: b.durLabel }, 'Could not parse duration, skipping flight');
+      continue;
+    }
+
     // Stops + flight number from leg text: "1 conexão    •  Voo 8751" or "Direto  •  Voo 1234"
     let stops = 0;
     const conexMatch = b.legText.match(/(\d+)\s*conex/i);
