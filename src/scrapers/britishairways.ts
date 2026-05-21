@@ -353,6 +353,12 @@ async function extractCardsNewUI(
     const priceGBP = parseGBP(card.priceText);
     if (priceGBP === null || priceGBP <= 0) continue;
 
+    const durationMin = parseDurationMin(card.durationText);
+    if (durationMin <= 0) {
+      logger.warn({ depIata: card.depIata, arrIata: card.arrIata }, 'Could not parse BA duration, skipping flight');
+      continue;
+    }
+
     const fares: FlightFares = { cash: { amount: priceGBP, currency: 'GBP' } };
 
     offers.push({
@@ -366,7 +372,7 @@ async function extractCardsNewUI(
         iata: card.arrIata || destination,
         timestamp: toTimestamp(date, card.arrTime, card.arrIata || destination),
       },
-      durationMin: parseDurationMin(card.durationText),
+      durationMin,
       stops: parseStops(card.stopsText),
       fares,
       isReturn: false,
@@ -436,6 +442,12 @@ async function extractCardsOldUI(
     const priceBRL = parseBRL(card.priceText);
     if (priceBRL === null || priceBRL <= 0) continue;
 
+    const durationMin = parseDurationMinOld(card.durationText);
+    if (durationMin <= 0) {
+      logger.warn({ depIata: card.depIata, arrIata: card.arrIata }, 'Could not parse BA duration, skipping flight');
+      continue;
+    }
+
     const fares: FlightFares = { cash: { amount: priceBRL, currency: 'BRL' } };
 
     offers.push({
@@ -449,7 +461,7 @@ async function extractCardsOldUI(
         iata: card.arrIata || destination,
         timestamp: toTimestamp(date, card.arrTime, card.arrIata || destination),
       },
-      durationMin: parseDurationMinOld(card.durationText),
+      durationMin,
       stops: parseStops(card.stopsText),
       fares,
       isReturn: false,

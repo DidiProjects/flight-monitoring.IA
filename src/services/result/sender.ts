@@ -4,8 +4,9 @@ import { logger } from '../../utils/logger.ts';
 import type { ScrapeResult } from '../../types/scrape.ts';
 import type { FlightOffer } from '../../types/index.ts';
 
-function toCallbackOffer(offer: FlightOffer) {
+function toCallbackOffer(offer: FlightOffer, airline: string) {
   return {
+    airline,
     flightNumber:  offer.flightNumber,
     date:          offer.date,
     isReturn:      offer.isReturn,
@@ -30,7 +31,7 @@ export function buildCallbackPayload(result: ScrapeResult) {
     airline:     result.airline,
     origin:      result.origin,
     destination: result.destination,
-    flights:     result.flights.map(toCallbackOffer),
+    flights:     result.flights.map((o) => toCallbackOffer(o, result.airline)),
     scrapedAt:   result.scrapedAt,
     error:       result.error,
   };

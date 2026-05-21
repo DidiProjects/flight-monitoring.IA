@@ -10,6 +10,9 @@ export async function post(url: string, body: unknown, apiKey: string): Promise<
       },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status} — ${url}`);
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status} — ${url} — ${text}`);
+    }
   });
 }

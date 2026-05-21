@@ -288,6 +288,12 @@ async function extractCards(
     const price = parsePrice(card.priceText);
     if (price === null || price <= 0) continue;
 
+    const durationMin = parseDurationMin(card.durationText);
+    if (durationMin <= 0) {
+      logger.warn({ depIata: card.depIata, arrIata: card.arrIata }, 'Could not parse Ryanair duration, skipping flight');
+      continue;
+    }
+
     const fares: FlightFares = {
       cash: { amount: price, currency: parseCurrency(card.priceText) },
     };
@@ -303,7 +309,7 @@ async function extractCards(
         iata: card.arrIata || destination,
         timestamp: toTimestamp(date, card.arrTime, card.arrIata || destination),
       },
-      durationMin: parseDurationMin(card.durationText),
+      durationMin,
       stops: 0,
       fares,
       isReturn: false,

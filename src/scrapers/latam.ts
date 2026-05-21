@@ -524,6 +524,10 @@ async function extractCards(
     if (!card.depTime || !card.arrTime) continue;
 
     const durationMin = parseDurationMin(card.durationText);
+    if (durationMin <= 0) {
+      logger.warn({ depIata: card.depIata, arrIata: card.arrIata, durationText: card.durationText }, 'Could not parse LATAM duration, skipping flight');
+      continue;
+    }
     const stops      = parseStops(card.stopsText);
 
     const flightNumber = card.flightNumber;
