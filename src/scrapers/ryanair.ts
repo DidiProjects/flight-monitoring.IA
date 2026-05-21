@@ -213,25 +213,10 @@ async function searchDateRange(
 
 async function dismissCookieBanner(page: Page): Promise<void> {
   // Try Ryanair's known cookie button selectors, then fall back to text matching
-  const selectors = [
-    '[data-ref="cookie.accept-all-button"]',
-    '[data-ref="cookie.no-thanks-button"]',
-    'button[class*="cookie"][class*="accept"]',
-    'button[class*="cookie"][class*="decline"]',
-  ];
-  for (const sel of selectors) {
-    const btn = page.locator(sel).first();
-    if (await btn.isVisible({ timeout: 1_000 }).catch(() => false)) {
-      await btn.click();
-      logger.debug('Ryanair cookie banner dismissed via selector');
-      return;
-    }
-  }
-  // Text-based fallback — accept mimics typical human behaviour
-  const btn = page.getByRole('button', { name: /yes,\s*i\s*agree/i }).first();
-  if (await btn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+  const btn = page.locator('[data-ref="cookie.accept-all"]');
+  if (await btn.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await btn.click();
-    logger.debug('Ryanair cookie banner dismissed via text match');
+    logger.debug('Ryanair cookie banner dismissed');
   }
 }
 
