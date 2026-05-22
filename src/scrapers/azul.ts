@@ -123,7 +123,7 @@ async function searchRoute(
   const logCtx: LogCtx = { requestId: params.requestId, routineId: params.routineId, airline: params.airline };
 
   try {
-    logger.info({ ...logCtx, origin, destination, startDate, endDate }, 'Opening search page');
+    logger.debug({ ...logCtx, origin, destination, startDate, endDate }, 'Opening search page');
 
     // ── Primary: direct URL → Fallback: form fill (with retry on API error) ────
     let firstLoaded = false;
@@ -178,7 +178,7 @@ async function searchRoute(
       if (i === 0) {
         // First date already loaded by tryDirectNavigation (or form fill)
         if (!firstLoaded) {
-          logger.info({ date, origin, destination }, 'No flights for start date, skipping');
+          logger.debug({ date, origin, destination }, 'No flights for start date, skipping');
           continue;
         }
       } else {
@@ -199,7 +199,7 @@ async function searchRoute(
         }
         await saveSnapshot(page, params.runDir, `${origin}-${destination}-${date}-results`);
         if (!loaded) {
-          logger.info({ date, origin, destination }, 'No flights for this date, skipping');
+          logger.debug({ date, origin, destination }, 'No flights for this date, skipping');
           continue;
         }
       }
@@ -208,7 +208,7 @@ async function searchRoute(
       const flights = await collectAllFares(page, origin, destination, date, params.runDir, logCtx);
       flights.forEach(o => { o.isReturn = isReturn; });
 
-      logger.info({ date, origin, destination, count: flights.length }, 'Date collected');
+      logger.debug({ date, origin, destination, count: flights.length }, 'Date collected');
 
       if (params.runDir) {
         const dateDir = path.join(params.runDir, date);
@@ -296,7 +296,7 @@ async function tryDirectNavigation(
         continue;
       }
 
-      logger.info({ origin, destination, date, attempt }, 'Direct URL navigation succeeded');
+      logger.debug({ origin, destination, date, attempt }, 'Direct URL navigation succeeded');
       return true;
     } catch (err) {
       logger.warn({ ...logCtx, attempt, err: String(err).slice(0, 120) }, 'Direct URL navigation attempt failed');

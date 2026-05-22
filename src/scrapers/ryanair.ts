@@ -160,7 +160,7 @@ async function searchDateRange(
   try {
     for (const date of dateRange(startDate, endDate)) {
       const url = buildSearchUrl(origin, destination, date, params.passengers);
-      logger.info({ origin, destination, date }, 'Navigating to Ryanair search');
+      logger.debug({ origin, destination, date }, 'Navigating to Ryanair search');
 
       await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
       await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
@@ -171,14 +171,14 @@ async function searchDateRange(
       await saveSnapshot(page, params.runDir, `ryanair-${origin}-${destination}-${date}`);
 
       if (!hasCards) {
-        logger.info({ date, origin, destination }, 'No Ryanair flights for this date');
+        logger.debug({ date, origin, destination }, 'No Ryanair flights for this date');
         continue;
       }
 
       const offers = await extractCards(page, origin, destination, date);
       offers.forEach(o => { o.isReturn = isReturn; });
 
-      logger.info({ date, origin, destination, count: offers.length }, 'Ryanair date collected');
+      logger.debug({ date, origin, destination, count: offers.length }, 'Ryanair date collected');
 
       if (params.runDir) {
         const dateDir = path.join(params.runDir, date);

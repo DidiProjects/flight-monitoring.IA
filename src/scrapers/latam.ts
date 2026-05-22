@@ -158,7 +158,7 @@ async function searchDateRange(
   try {
     for (const date of dateRange(startDate, endDate)) {
       const url = buildSearchUrl(origin, destination, date, redemption, params.passengers);
-      logger.info({ origin, destination, date, redemption }, 'Navigating to LATAM search');
+      logger.debug({ origin, destination, date, redemption }, 'Navigating to LATAM search');
 
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
       await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
@@ -186,14 +186,14 @@ async function searchDateRange(
       await saveSnapshot(page, params.runDir, `latam-${origin}-${destination}-${date}-${redemption ? 'pts' : 'cash'}`);
 
       if (!hasCards) {
-        logger.info({ date, origin, destination }, 'No LATAM flights for this date');
+        logger.debug({ date, origin, destination }, 'No LATAM flights for this date');
         continue;
       }
 
       const offers = await extractCards(page, origin, destination, date, redemption, params.runDir);
       offers.forEach(o => { o.isReturn = isReturn; });
 
-      logger.info({ date, origin, destination, count: offers.length }, 'LATAM date collected');
+      logger.debug({ date, origin, destination, count: offers.length }, 'LATAM date collected');
 
       if (params.runDir) {
         const dateDir = path.join(params.runDir, date);

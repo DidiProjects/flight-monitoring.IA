@@ -31,6 +31,7 @@ function buildTransport(): pino.TransportSingleOptions | pino.TransportMultiOpti
         host: lokiUrl,
         basicAuth: { username: lokiUser, password: lokiToken },
         labels: { app: 'scraping-api', env: process.env['NODE_ENV'] ?? 'production' },
+        propsToLabels: ['airline'],
         interval: 5,
         replaceTimestamp: true,
         silenceErrors: false,
