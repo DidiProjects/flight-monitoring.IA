@@ -1065,7 +1065,7 @@
       "spec": {
         "allowCustomValue": true,
         "current": {
-          "text": ".*",
+          "text": "All",
           "value": ".*"
         },
         "hide": "dontHide",
@@ -1074,7 +1074,7 @@
         "multi": false,
         "name": "level",
         "options": [],
-        "query": ".*,error,warning,info,debug",
+        "query": "All : .*,error,warning,info,debug",
         "skipUrlSync": false,
         "valuesFormat": "csv"
       }
@@ -1090,7 +1090,6 @@
         "datasource": {
           "name": "${DS_LOKI}"
         },
-        "definition": "label_values({app=~\"scraping-api|flight-api\"}, airline)",
         "hide": "dontHide",
         "includeAll": true,
         "allValue": ".*",
@@ -1098,11 +1097,23 @@
         "multi": false,
         "name": "airline",
         "options": [],
-        "query": "label_values({app=~\"scraping-api|flight-api\"}, airline)",
+        "query": {
+          "datasource": {
+            "name": "${DS_LOKI}"
+          },
+          "group": "loki",
+          "kind": "DataQuery",
+          "spec": {
+            "label": "airline",
+            "stream": "{app=~\"scraping-api|flight-api\"}",
+            "type": 1
+          },
+          "version": "v0"
+        },
         "refresh": "onDashboardLoad",
         "regex": "",
         "skipUrlSync": false,
-        "sort": 1
+        "sort": "asc"
       }
     },
     {
