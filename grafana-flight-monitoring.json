@@ -41,7 +41,7 @@
                     "group": "loki",
                     "kind": "DataQuery",
                     "spec": {
-                      "expr": "{app=\"scraping-api\", level=~\"$level_scraping\"} |= `$search` | json | airline=~\"$airline_scraping\"",
+                      "expr": "{app=\"scraping-api\", level=~\"$level\"} |= `$search` | json | airline=~\"$airline\"",
                       "legendFormat": "",
                       "range": true
                     },
@@ -108,7 +108,7 @@
                     "group": "loki",
                     "kind": "DataQuery",
                     "spec": {
-                      "expr": "sum by (airline) (count_over_time({app=\"scraping-api\", level=~\"error|warning\"} | json | airline=~\"$airline_scraping\" | airline != \"\" [$__range]))",
+                      "expr": "sum by (airline) (count_over_time({app=\"scraping-api\", level=~\"error|warning\"} | json | airline=~\"$airline\" | airline != \"\" [$__range]))",
                       "instant": true,
                       "legendFormat": "{{airline}}"
                     },
@@ -189,7 +189,7 @@
                     "group": "loki",
                     "kind": "DataQuery",
                     "spec": {
-                      "expr": "sum by (airline) (count_over_time({app=\"scraping-api\", level=\"error\"} | json | airline=~\"$airline_scraping\" | airline != \"\" [$__interval]))",
+                      "expr": "sum by (airline) (count_over_time({app=\"scraping-api\", level=\"error\"} | json | airline=~\"$airline\" | airline != \"\" [$__interval]))",
                       "legendFormat": "{{airline}}",
                       "range": true
                     },
@@ -308,7 +308,7 @@
                     "group": "loki",
                     "kind": "DataQuery",
                     "spec": {
-                      "expr": "sum by (airline) (count_over_time({app=\"scraping-api\", level=\"warning\"} | json | airline=~\"$airline_scraping\" | airline != \"\" [$__interval]))",
+                      "expr": "sum by (airline) (count_over_time({app=\"scraping-api\", level=\"warning\"} | json | airline=~\"$airline\" | airline != \"\" [$__interval]))",
                       "legendFormat": "{{airline}}",
                       "range": true
                     },
@@ -427,7 +427,7 @@
                     "group": "loki",
                     "kind": "DataQuery",
                     "spec": {
-                      "expr": "{app=\"flight-api\", level=~\"$level_api\"} |= `$search` | json | airline=~\"$airline_api\"",
+                      "expr": "{app=\"flight-api\", level=~\"$level\"} |= `$search` | json | airline=~\"$airline\"",
                       "legendFormat": "",
                       "range": true
                     },
@@ -494,7 +494,7 @@
                     "group": "loki",
                     "kind": "DataQuery",
                     "spec": {
-                      "expr": "sum by (level) (count_over_time({app=\"flight-api\", level=~\"error|warning\"} | json | airline=~\"$airline_api\" [$__range]))",
+                      "expr": "sum by (level) (count_over_time({app=\"flight-api\", level=~\"error|warning\"} | json | airline=~\"$airline\" [$__range]))",
                       "instant": true,
                       "legendFormat": "{{level}}"
                     },
@@ -606,7 +606,7 @@
                     "group": "loki",
                     "kind": "DataQuery",
                     "spec": {
-                      "expr": "sum by (level) (count_over_time({app=\"flight-api\", level=~\"error|warning\"} | json | airline=~\"$airline_api\" [$__interval]))",
+                      "expr": "sum by (level) (count_over_time({app=\"flight-api\", level=~\"error|warning\"} | json | airline=~\"$airline\" [$__interval]))",
                       "legendFormat": "{{level}}",
                       "range": true
                     },
@@ -756,7 +756,7 @@
                     "group": "loki",
                     "kind": "DataQuery",
                     "spec": {
-                      "expr": "sum by (error_type) (count_over_time({app=\"scraping-api\", level=\"error\"} | json | error_type != \"\" | airline=~\"$airline_scraping\" [$__range]))",
+                      "expr": "sum by (error_type) (count_over_time({app=\"scraping-api\", level=\"error\"} | json | error_type != \"\" | airline=~\"$airline\" [$__range]))",
                       "instant": true,
                       "legendFormat": "{{error_type}}"
                     },
@@ -1070,9 +1070,9 @@
         },
         "hide": "dontHide",
         "includeAll": false,
-        "label": "Nível — scraping.API",
+        "label": "Nível",
         "multi": false,
-        "name": "level_scraping",
+        "name": "level",
         "options": [],
         "query": ".*,error,warning,info,debug",
         "skipUrlSync": false,
@@ -1080,60 +1080,29 @@
       }
     },
     {
-      "kind": "CustomVariable",
+      "kind": "QueryVariable",
       "spec": {
         "allowCustomValue": true,
         "current": {
-          "text": ".*",
-          "value": ".*"
+          "text": "All",
+          "value": "$__all"
         },
-        "hide": "dontHide",
-        "includeAll": false,
-        "label": "Nível — flight.API",
-        "multi": false,
-        "name": "level_api",
-        "options": [],
-        "query": ".*,error,warning,info,debug",
-        "skipUrlSync": false,
-        "valuesFormat": "csv"
-      }
-    },
-    {
-      "kind": "CustomVariable",
-      "spec": {
-        "allowCustomValue": true,
-        "current": {
-          "text": ".*",
-          "value": ".*"
+        "datasource": {
+          "name": "${DS_LOKI}"
         },
+        "definition": "label_values({app=~\"scraping-api|flight-api\"}, airline)",
         "hide": "dontHide",
-        "includeAll": false,
-        "label": "Airline — scraping.API",
+        "includeAll": true,
+        "allValue": ".*",
+        "label": "Airline",
         "multi": false,
-        "name": "airline_scraping",
+        "name": "airline",
         "options": [],
-        "query": ".*,azul,latam,britishairways,ryanair",
+        "query": "label_values({app=~\"scraping-api|flight-api\"}, airline)",
+        "refresh": "onDashboardLoad",
+        "regex": "",
         "skipUrlSync": false,
-        "valuesFormat": "csv"
-      }
-    },
-    {
-      "kind": "CustomVariable",
-      "spec": {
-        "allowCustomValue": true,
-        "current": {
-          "text": ".*",
-          "value": ".*"
-        },
-        "hide": "dontHide",
-        "includeAll": false,
-        "label": "Airline — flight.API",
-        "multi": false,
-        "name": "airline_api",
-        "options": [],
-        "query": ".*,azul,latam,britishairways,ryanair",
-        "skipUrlSync": false,
-        "valuesFormat": "csv"
+        "sort": 1
       }
     },
     {

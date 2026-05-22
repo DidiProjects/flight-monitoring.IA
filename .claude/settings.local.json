@@ -40,7 +40,9 @@
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\\\\scraping-result\" -Directory | Sort-Object LastWriteTime -Descending | ForEach-Object { \"$\\($_.LastWriteTime\\) - $\\($_.Name\\)\" })",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\\\\scraping-result\\\\2026-05-19T11-30-20_fe1f27f6_CNF-GRU\" -Recurse -Force | ForEach-Object { \"$\\($_.Length.ToString\\(\\).PadLeft\\(8\\)\\) $\\($_.FullName.Replace\\('C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\\\\scraping-result\\\\2026-05-19T11-30-20_fe1f27f6_CNF-GRU\\\\', ''\\)\\)\" })",
       "Bash(dir \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\flight.FRONT\\\\src\" /s /b)",
-      "Bash(findstr /v node_modules)"
+      "Bash(findstr /v node_modules)",
+      "PowerShell(Get-WmiObject *)",
+      "PowerShell(Get-Item *)"
     ]
   }
 }
