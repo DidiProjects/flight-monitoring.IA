@@ -142,7 +142,7 @@ async function searchRoute(
           await new Promise(r => setTimeout(r, 120_000));
         }
         logger.info({ ...logCtx, origin, destination, attempt }, 'Falling back to form fill');
-        await page.goto(AZUL_HOME, { waitUntil: 'load', timeout: 60_000 });
+        await page.goto(AZUL_HOME, { waitUntil: 'domcontentloaded', timeout: 60_000 });
         await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
         await humanDelay(3_000, 5_000);
         await waitForEvalReady(page);
@@ -189,6 +189,11 @@ async function searchRoute(
           loaded = await waitForResults(page, logCtx);
         } else {
           // Fallback: calendar navigation (only works if still on the results page)
+          const hasCalendar = (await page.locator('.booking-calendar__cards').count().catch(() => 0)) > 0;
+          if (!hasCalendar) {
+            logger.warn({ ...logCtx, date, origin, destination }, 'Direct URL failed and page not on results, skipping date');
+            continue;
+          }
           logger.warn({ ...logCtx, date }, 'Direct URL failed, trying calendar navigation');
           const navigated = await navigateCalendarToDate(page, date, logCtx);
           if (!navigated) {
@@ -272,7 +277,7 @@ async function tryDirectNavigation(
   for (let attempt = 1; attempt <= 3; attempt++) {
     logger.debug({ attempt, origin, destination, date }, 'Trying direct URL navigation');
     try {
-      await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
       await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
       await humanDelay(1_500, 2_500);
       await waitForEvalReady(page);

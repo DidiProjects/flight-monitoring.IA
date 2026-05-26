@@ -239,7 +239,7 @@ async function dismissCookieBanner(page: Page): Promise<void> {
 // ── Wait for cards ──────────────────────────────────────────────────────────────
 
 async function waitForCards(page: Page, logCtx: LogCtx = {}): Promise<boolean> {
-  const deadline = Date.now() + 90_000;
+  const deadline = Date.now() + 45_000;
 
   while (Date.now() < deadline) {
     const hasNewCard = await page.locator('[data-ds-cr-name="Card"]')
@@ -251,15 +251,27 @@ async function waitForCards(page: Page, logCtx: LogCtx = {}): Promise<boolean> {
       .count().then(c => c > 0).catch(() => false);
     if (hasOldCard) return true;
 
-    const noFlights = await page.evaluate(() =>
-      /no flights|no results|unavailable|0 flights/i.test(document.body.innerText),
-    ).catch(() => false);
-    if (noFlights) return false;
+    const isDone = await page.evaluate(() => {
+      const text = document.body.innerText;
+      if (/no flights|no results|unavailable|0 flights/i.test(text)) return 'no_flights';
+      if (/something went wrong|try again|access denied|403/i.test(text)) return 'error_page';
+      if (document.querySelector('#onetrust-accept-btn-handler')) return 'cookie_wall';
+      return null;
+    }).catch(() => null);
+
+    if (isDone === 'no_flights') return false;
+    if (isDone === 'error_page') {
+      logger.warn({ ...logCtx }, 'BA error page detected, skipping date');
+      return false;
+    }
+    if (isDone === 'cookie_wall') {
+      await page.locator('#onetrust-accept-btn-handler').click().catch(() => {});
+    }
 
     await page.waitForTimeout(1_000);
   }
 
-  logger.warn({ ...logCtx }, 'BA waitForCards timed out');
+  logger.debug({ ...logCtx }, 'BA waitForCards timed out — no cards found for this date');
   return false;
 }
 
