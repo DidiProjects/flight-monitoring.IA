@@ -404,26 +404,20 @@ async function extractCards(
     while (true) {
       if (!document.querySelector(`[data-testid="wrapper-card-header-${i}"]`)) break;
 
-      // Origin: first span = departure time, second = IATA
+      // Origin: time is inside [data-testid="flight-time-inline"] span; IATA is the direct > span child
       const originDiv = document.querySelector(`[data-testid="flight-info-${i}-origin"]`);
-      const originSpans = originDiv ? Array.from(originDiv.querySelectorAll(':scope > span')) : [];
-      const depTime = originSpans[0]?.textContent?.trim() ?? '';
-      const depIata = originSpans[1]?.textContent?.trim() ?? '';
+      const depTime = originDiv?.querySelector('[data-testid="flight-time-inline"] span')?.textContent?.trim() ?? '';
+      const depIata = originDiv?.querySelector(':scope > span')?.textContent?.trim() ?? '';
 
       // Duration: second span inside duration div ("1 h 10 min.")
       const durationDiv = document.querySelector(`[data-testid="flight-info-${i}-duration"]`);
       const durationSpans = durationDiv ? Array.from(durationDiv.querySelectorAll('span')) : [];
       const durationText = (durationSpans[1] ?? durationSpans[0])?.textContent?.trim() ?? '';
 
-      // Destination: first text node of first span (ignores nested "+1 day" span), second span = IATA
+      // Destination: time inside flight-time-inline span (textContent includes "+1" if next-day); IATA is direct > span
       const destDiv = document.querySelector(`[data-testid="flight-info-${i}-destination"]`);
-      const destSpans = destDiv ? Array.from(destDiv.querySelectorAll(':scope > span')) : [];
-      const arrTime = Array.from(destSpans[0]?.childNodes ?? [])
-        .filter(n => n.nodeType === 3)
-        .map(n => (n as Text).data.trim())
-        .join('')
-        .trim();
-      const arrIata = destSpans[1]?.textContent?.trim() ?? '';
+      const arrTime = destDiv?.querySelector('[data-testid="flight-time-inline"] span')?.textContent?.trim() ?? '';
+      const arrIata = destDiv?.querySelector(':scope > span')?.textContent?.trim() ?? '';
 
       // Stops: from footer card anchor text
       const footerCard = document.querySelector(`[data-testid="footer-card-${i}"]`);

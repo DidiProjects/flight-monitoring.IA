@@ -93,8 +93,22 @@ function ianaOffsetFor(ianaZone: string, date: Date): string {
 
 export function toTimestamp(date: string, time: string, iata: string): string {
   const zone = AIRPORT_TZ[iata];
-  const [h, m] = time.split(':');
+  // Some airlines (e.g. LATAM) append "+1"/"+2" to arrival times indicating next-day arrival.
+  // Extract the day offset and apply it to the date so the timestamp is correct.
+  const match = time.match(/^(\d{1,2}:\d{2})([+-]\d+)?$/);
+  const cleanTime = match?.[1] ?? time;
+  const dayOffset = match?.[2] ? parseInt(match[2], 10) : 0;
+
+  const [h, m] = cleanTime.split(':');
   const padded = `${(h ?? '0').padStart(2, '0')}:${(m ?? '00').padStart(2, '0')}`;
-  const tz = zone ? ianaOffsetFor(zone, new Date(`${date}T${padded}:00`)) : '+00:00';
-  return `${date}T${padded}:00${tz}`;
+
+  let resolvedDate = date;
+  if (dayOffset !== 0) {
+    const d = new Date(`${date}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + dayOffset);
+    resolvedDate = d.toISOString().slice(0, 10);
+  }
+
+  const tz = zone ? ianaOffsetFor(zone, new Date(`${resolvedDate}T${padded}:00`)) : '+00:00';
+  return `${resolvedDate}T${padded}:00${tz}`;
 }
