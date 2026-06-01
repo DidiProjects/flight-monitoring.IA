@@ -1,5 +1,6 @@
-import { chromium } from 'playwright';
+import { firefox } from 'playwright';
 import type { Browser, BrowserContext, Cookie, Page } from 'playwright';
+import { launchOptions as camoufoxLaunchOptions } from 'camoufox-js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { BLOCKED_RESOURCES } from '../config/browser.ts';
@@ -106,10 +107,13 @@ function parseDurationMinOld(text: string): number {
 // ── Main entry ──────────────────────────────────────────────────────────────────
 
 export async function searchFlights(params: ScraperParams): Promise<FlightOffer[]> {
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--disable-blink-features=AutomationControlled'],
+  const foxOptions = await camoufoxLaunchOptions({
+    headless: false,
+    os: 'windows',
+    locale: 'en-GB',
+    humanize: true,
   });
+  const browser = await firefox.launch(foxOptions);
   const allOffers: FlightOffer[] = [];
   const savedCookies = await loadSavedCookies();
 
