@@ -4,7 +4,7 @@ import { authMiddleware } from '../middleware/auth.ts';
 import { queue } from '../queue/index.ts';
 import { runCoverageJob } from '../services/coverage/runner.ts';
 
-const SUPPORTED_AIRLINES = new Set(['ryanair', 'britishairways']);
+const SUPPORTED_AIRLINES = new Set(['ryanair']);
 
 const CoverageRequestSchema = z.object({
   airline: z.string().min(1),
