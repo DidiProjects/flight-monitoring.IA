@@ -42,7 +42,15 @@
       "Bash(dir \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\flight.FRONT\\\\src\" /s /b)",
       "Bash(findstr /v node_modules)",
       "PowerShell(Get-WmiObject *)",
-      "PowerShell(Get-Item *)"
+      "PowerShell(Get-Item *)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "PowerShell($proc = Start-Process npm -ArgumentList \"run\",\"dev\" -WorkingDirectory \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\" -NoNewWindow -RedirectStandardOutput \"$env:TEMP\\\\scraping-ba.log\" -RedirectStandardError \"$env:TEMP\\\\scraping-ba-err.log\" -PassThru; $proc.Id)",
+      "PowerShell($proc = Start-Process \"node\" -ArgumentList \"node_modules\\\\.bin\\\\tsx\",\"watch\",\"src/main.ts\" -WorkingDirectory \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\scraping.API\" -NoNewWindow -RedirectStandardOutput \"$env:TEMP\\\\scraping-ba.log\" -RedirectStandardError \"$env:TEMP\\\\scraping-ba-err.log\" -PassThru; Start-Sleep 4; $proc.Id)",
+      "PowerShell(Stop-Process *)",
+      "Bash(rm \"C:/Users/diego/Documents/projects/scraping.API/src/routes/coverage.ts\")",
+      "Bash(rm \"C:/Users/diego/Documents/projects/scraping.API/src/utils/coverage-runs.ts\")",
+      "Bash(rm -rf \"C:/Users/diego/Documents/projects/scraping.API/src/services/coverage\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts', {}\\), indent=2\\)\\)\")"
     ]
   }
 }
