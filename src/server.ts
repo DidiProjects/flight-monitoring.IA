@@ -1,7 +1,6 @@
 import Fastify from 'fastify';
 import { healthRoutes } from './routes/health.ts';
 import { scrapeRoutes } from './routes/scrape.ts';
-import { coverageRoutes } from './routes/coverage.ts';
 import { logger } from './utils/logger.ts';
 
 export function buildServer() {
@@ -14,7 +13,6 @@ export function buildServer() {
 
   app.register(healthRoutes);
   app.register(scrapeRoutes);
-  app.register(coverageRoutes);
 
   return app;
 }
