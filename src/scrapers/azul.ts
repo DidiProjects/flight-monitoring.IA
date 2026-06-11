@@ -167,9 +167,12 @@ async function searchRoute(
       }
     }
     const dates = [...dateRange(startDate, endDate)];
+    const MAX_CONSECUTIVE_EMPTY = 3;
+    let consecutiveEmpty = 0;
 
     for (let i = 0; i < dates.length; i++) {
       const date = dates[i]!;
+      let dateFlights: FlightOffer[] = [];
 
       if (i > 0) {
         await humanDelay(6_000, 12_000);
@@ -179,7 +182,11 @@ async function searchRoute(
         // First date already loaded by tryDirectNavigation (or form fill)
         if (!firstLoaded) {
           logger.debug({ date, origin, destination }, 'No flights for start date, skipping');
-          continue;
+        } else {
+          // Collect all fares (BRL + points + hybrid) in a single pass
+          dateFlights = await collectAllFares(page, origin, destination, date, params.runDir, logCtx);
+          dateFlights.forEach(o => { o.isReturn = isReturn; });
+          logger.debug({ date, origin, destination, count: dateFlights.length }, 'Date collected');
         }
       } else {
         // Primary: direct URL navigation for this specific date
@@ -192,39 +199,48 @@ async function searchRoute(
           const hasCalendar = (await page.locator('.booking-calendar__cards').count().catch(() => 0)) > 0;
           if (!hasCalendar) {
             logger.warn({ ...logCtx, date, origin, destination }, 'Direct URL failed and page not on results, skipping date');
-            continue;
+            loaded = false;
+          } else {
+            logger.warn({ ...logCtx, date }, 'Direct URL failed, trying calendar navigation');
+            const navigated = await navigateCalendarToDate(page, date, logCtx);
+            if (!navigated) {
+              logger.warn({ ...logCtx, date, origin, destination }, 'Calendar navigation also failed, skipping date');
+              loaded = false;
+            } else {
+              loaded = await waitForResults(page, logCtx);
+            }
           }
-          logger.warn({ ...logCtx, date }, 'Direct URL failed, trying calendar navigation');
-          const navigated = await navigateCalendarToDate(page, date, logCtx);
-          if (!navigated) {
-            logger.warn({ ...logCtx, date, origin, destination }, 'Calendar navigation also failed, skipping date');
-            continue;
-          }
-          loaded = await waitForResults(page, logCtx);
         }
         await saveSnapshot(page, params.runDir, `${origin}-${destination}-${date}-results`);
         if (!loaded) {
           logger.debug({ date, origin, destination }, 'No flights for this date, skipping');
-          continue;
+        } else {
+          // Collect all fares (BRL + points + hybrid) in a single pass
+          dateFlights = await collectAllFares(page, origin, destination, date, params.runDir, logCtx);
+          dateFlights.forEach(o => { o.isReturn = isReturn; });
+          logger.debug({ date, origin, destination, count: dateFlights.length }, 'Date collected');
         }
       }
 
-      // Collect all fares (BRL + points + hybrid) in a single pass
-      const flights = await collectAllFares(page, origin, destination, date, params.runDir, logCtx);
-      flights.forEach(o => { o.isReturn = isReturn; });
-
-      logger.debug({ date, origin, destination, count: flights.length }, 'Date collected');
-
-      if (params.runDir) {
-        const dateDir = path.join(params.runDir, date);
-        await fs.mkdir(dateDir, { recursive: true });
-        await fs.writeFile(
-          path.join(dateDir, `${origin}-${destination}.json`),
-          JSON.stringify(flights, null, 2),
-        );
+      if (dateFlights.length > 0) {
+        consecutiveEmpty = 0;
+        if (params.runDir) {
+          const dateDir = path.join(params.runDir, date);
+          await fs.mkdir(dateDir, { recursive: true });
+          await fs.writeFile(
+            path.join(dateDir, `${origin}-${destination}.json`),
+            JSON.stringify(dateFlights, null, 2),
+          );
+        }
+        allOffers.push(...dateFlights);
+      } else {
+        consecutiveEmpty++;
+        if (consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
+          const msg = `Azul: ${MAX_CONSECUTIVE_EMPTY} consecutive dates with no results for ${origin}→${destination} — route may be inactive or unavailable. Aborting at ${date}.`;
+          logger.warn({ ...logCtx, origin, destination, date, consecutiveEmpty }, 'Circuit breaker triggered — aborting date range');
+          throw new Error(msg);
+        }
       }
-
-      allOffers.push(...flights);
     }
 
   } catch (err) {
