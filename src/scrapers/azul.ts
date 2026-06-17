@@ -234,6 +234,14 @@ async function searchRoute(
         }
         allOffers.push(...dateFlights);
       } else {
+        // Zero fares: disambiguate genuine empty-state from a silent bot/IP block.
+        const genuineEmpty = await isGenuineEmptyState(page);
+        if (!genuineEmpty) {
+          const msg = `Azul: zero fares and no empty-state marker for ${origin}→${destination} on ${date} — likely bot/IP block.`;
+          logger.warn({ ...logCtx, origin, destination, date }, 'Suspected bot/IP block: empty result without empty-state marker');
+          throw new Error(msg);
+        }
+
         consecutiveEmpty++;
         if (consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
           const msg = `Azul: ${MAX_CONSECUTIVE_EMPTY} consecutive dates with no results for ${origin}→${destination} — route may be inactive or unavailable. Aborting at ${date}.`;
@@ -340,6 +348,21 @@ async function checkForBlock(page: Page): Promise<void> {
   ) {
     throw new Error('Azul website blocked this request (bot/IP detection).');
   }
+}
+
+// Distinguishes a legitimate "no flights for this date" page from a silent block.
+// Azul's empty-state shows the icon-not-found image + a "não temos voos disponíveis"
+// message. If we collected zero fares and NONE of these markers are present, the
+// page is almost certainly a bot/IP block masquerading as an empty result.
+async function isGenuineEmptyState(page: Page): Promise<boolean> {
+  const body = await page.locator('body').innerText({ timeout: 3_000 }).catch(() => '');
+  if (/não temos voos dispon|nenhum voo dispon|escolher uma nova data|refazer a sua busca/i.test(body)) {
+    return true;
+  }
+  if ((await page.locator('img[src*="icon-not-found"]').count().catch(() => 0)) > 0) return true;
+  // Legacy hashed-class fallback (fragile — Azul regenerates these on deploy)
+  if ((await page.locator('p.css-1wdbheb').count().catch(() => 0)) > 0) return true;
+  return false;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

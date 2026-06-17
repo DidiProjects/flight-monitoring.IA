@@ -188,6 +188,13 @@ async function searchDateRange(
       await saveSnapshot(page, params.runDir, `ba-${origin}-${destination}-${date}`);
 
       if (!hasCards) {
+        // Disambiguate genuine empty-state from a silent bot/IP block.
+        const genuineEmpty = await isGenuineEmptyState(page);
+        if (!genuineEmpty) {
+          const msg = `BA: zero cards and no empty-state marker for ${origin}→${destination} on ${date} — likely bot/IP block.`;
+          logger.warn({ ...logCtx, origin, destination, date }, 'Suspected bot/IP block: empty result without empty-state marker');
+          throw new Error(msg);
+        }
         logger.debug({ date, origin, destination }, 'No BA flights for this date');
         continue;
       }
@@ -261,6 +268,14 @@ async function waitForCards(page: Page, logCtx: LogCtx = {}): Promise<boolean> {
 
   logger.warn({ ...logCtx }, 'BA waitForCards timed out');
   return false;
+}
+
+// Distinguishes a legitimate "no flights" page from a silent block: if zero cards
+// AND none of the known empty-state messages are present, it's almost certainly a block.
+async function isGenuineEmptyState(page: Page): Promise<boolean> {
+  return await page.evaluate(() =>
+    /no flights|no results|unavailable|0 flights/i.test(document.body.innerText),
+  ).catch(() => false);
 }
 
 // ── Card extraction ─────────────────────────────────────────────────────────────

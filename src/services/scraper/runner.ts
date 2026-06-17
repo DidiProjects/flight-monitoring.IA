@@ -16,7 +16,7 @@ let lastAzulRunAt = 0;
 
 function categorizeError(err: unknown): string {
   const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
-  if (msg.includes('comportamento incomum') || msg.includes('acesso foi limitado') || msg.includes('bot')) return 'bot_detection';
+  if (msg.includes('comportamento incomum') || msg.includes('acesso foi limitado') || msg.includes('bot') || msg.includes('block')) return 'bot_detection';
   if (msg.includes('timeout') || msg.includes('timed out')) return 'timeout';
   if (msg.includes('navigation') || msg.includes('navigate')) return 'navigation';
   if (msg.includes('unsupported airline')) return 'unsupported_airline';
