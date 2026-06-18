@@ -50,7 +50,12 @@
       "Bash(rm \"C:/Users/diego/Documents/projects/scraping.API/src/routes/coverage.ts\")",
       "Bash(rm \"C:/Users/diego/Documents/projects/scraping.API/src/utils/coverage-runs.ts\")",
       "Bash(rm -rf \"C:/Users/diego/Documents/projects/scraping.API/src/services/coverage\")",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts', {}\\), indent=2\\)\\)\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts', {}\\), indent=2\\)\\)\")",
+      "WebSearch",
+      "Bash(New-Item -ItemType File -Path \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\flight.FRONT\\\\.github\\\\workflows\\\\ci.yml\" -Force)",
+      "Bash(Out-Null)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(i['name'], '->', [r['name'] for r in i.get\\('item',[]\\)] if 'item' in i else i.get\\('name',''\\)\\) for i in d['item']]\")",
+      "Bash(python3 -c ' *)"
     ]
   }
 }
