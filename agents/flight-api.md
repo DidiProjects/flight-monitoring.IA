@@ -1,106 +1,49 @@
 # Agente: flight.API
 
-Você é um agente especializado no projeto **flight.API**, localizado em `C:\Users\diego\Documents\projects\flight.API`.
+Projeto em `C:\Users\diego\Documents\projects\flight.API`. REST API (Fastify) — é o cérebro do sistema: deriva jobs de scraping, recebe os resultados por webhook, avalia ofertas contra os targets e envia alertas por email.
 
 ## Stack
 
-- **Runtime:** Node.js 22 + TypeScript 5.4.5
-- **Framework:** Fastify 5.8.5
-- **Banco:** PostgreSQL 16 (via `pg.Pool` em `src/db/pool.ts`)
-- **Auth:** JWT (`@fastify/jwt`) + bcryptjs
-- **Validação:** Zod 3
-- **Email:** nodemailer
-- **Logging:** pino + pino-loki (Grafana Loki opcional)
-- **Testes:** Vitest 4
-- **Build:** `tsc` → `build/`; dev com `tsx watch`
+Node.js 22 + TypeScript 5 + Fastify 5 · PostgreSQL (`pg.Pool`) · JWT (`@fastify/jwt`) + bcryptjs · Zod 3 · nodemailer · pino (+ pino-loki opcional) · Vitest 4. Build `tsc` → `build/`; dev `tsx watch`.
 
-## Estrutura de pastas
+## Estrutura
 
-```
-src/
-├── config/env.ts           # Zod schema das env vars
-├── db/pool.ts              # pg.Pool compartilhada
-├── container.ts            # DI manual (instancia repos → services → routes)
-├── modules/
-│   ├── auth/               # Login, JWT, password reset
-│   ├── users/              # CRUD de usuários (admin)
-│   ├── airlines/           # Gerenciamento de companhias
-│   ├── routines/           # Regras de monitoramento
-│   ├── scrape/             # Webhook recebido do scraping.API
-│   ├── register/           # Solicitações de cadastro
-│   └── unsubscribe/        # Descadastro de email
-├── services/
-│   ├── email/              # Templates HTML + SMTP
-│   ├── notifications/      # Lógica de alerta + tokens de unsubscribe
-│   └── scheduler/          # Loop de scraping periódico + jobs diários
-└── utils/
-    ├── crypto.ts           # bcrypt, tokens
-    └── errors.ts           # ApiError e subclasses (BadRequest, Unauthorized, etc.)
-```
+- `src/config/env.ts` — env vars (Zod) · `src/db/pool.ts` — pool compartilhada · `src/container.ts` — DI manual.
+- `src/modules/` — `auth`, `users`, `airlines`, `airports`, `routines`, `scrape` (webhook), `scraping-jobs`, `flight-fares`, `analysis-runs`, `register`, `unsubscribe`, `health`.
+- `src/services/` — `scheduler`, `evaluation`, `notifications`, `email`.
 
-## Padrão de módulo
+Cada módulo: `interfaces/`, `<Domain>Repository.ts` (SQL puro), `<Domain>Service.ts` (lógica), `route.ts`, `schema.ts` (Zod).
 
-Cada módulo em `src/modules/<domain>/` segue:
-```
-interfaces/I<Domain>Repository.ts
-interfaces/I<Domain>Service.ts
-<Domain>Repository.ts   ← SQL puro, pg.Pool
-<Domain>Service.ts      ← lógica de negócio
-route.ts                ← factory: (service) => FastifyPlugin
-schema.ts               ← schemas Zod
-```
+## Convenções
 
-## Convenções críticas
+- Prefixo global `/flight`. Auth Bearer JWT; webhook do scraper usa `x-api-key`.
+- Erros via `ApiError` (subclasses em `utils/errors.ts`); rate limit 120/min/IP; CORS restrito a `FRONTEND_URL`.
+- Schema/tabelas vivem no **flight.DB** — consultar lá; não documentar schema aqui.
 
-- **Prefixo global:** todas as rotas têm prefixo `/flight`
-- **Auth:** Bearer Token (`Authorization: Bearer <jwt>`) + API Key (`x-api-key`) para o webhook do scraper
-- **JWT payload:** `{ sub, role, email, mustChangePassword }`
-- **Roles:** `admin | user`
-- **Erro:** classe `ApiError` com `statusCode`; throw para o errorHandler tratar
-- **Rate limit:** 120 req/min por IP
-- **CORS:** restrito a `env.FRONTEND_URL`
-- **Logging:** pino estruturado; Loki opcional via `GRAFANA_LOKI_*` env
+## Rodar
 
-## Rodar localmente
+`npm install` → `.env` (ver `.env.example`) → `npm run start:dev` (dev) · `npm run build` · `npm test` · `npm run typecheck`. Requer Postgres (flight.DB) no ar.
 
-```bash
-npm install
-# Copiar .env.example para .env e preencher
-npm run start:dev    # tsx watch (desenvolvimento)
-npm run build        # compila para build/
-npm start            # produção
-npm run typecheck    # valida tipos
-npm test             # vitest
-```
+## Scheduler (`src/services/scheduler/`)
 
-**Pré-requisito:** PostgreSQL rodando (flight.DB iniciado via Docker)
+Opera sobre `scraping_jobs` (um job por `airline × origin × destination × flight_date`), **não por rotina**. Loops:
 
-## Integração com outros serviços
+- **Derivação** — deriva/upserta jobs das rotinas ativas e recalcula prioridade (staleness + proximidade do voo).
+- **Dispatch** — a cada `SCRAPE_INTERVAL_MS` reivindica jobs por companhia (`SKIP LOCKED`) e dispara `POST {SCRAPING_API_URL}/scrape`. Limite de `SCRAPE_DISPATCH_BATCH` jobs por companhia por tick (= sessões simultâneas no mesmo IP; mantido baixo p/ stealth). Circuit breaker por companhia.
+- **Heartbeat** — recupera jobs travados em `running` (vira `dead` ao atingir `max_retries`).
+- **Evaluation** (5min) e **tarefas diárias** (agregação/cleanup com catch-up).
 
-**Recebe:**
-- `POST /flight/scrape/results` — webhook do `scraping.API` com ofertas de voos (header `x-api-key`)
+Reagendamento após sucesso (`calcNextRunAt`): voo ≤7d → 1h · ≤14d → 2h · ≤30d → 4h · ≤60d → 6h · >60d → 12h. Jobs `success` voltam a ser elegíveis quando `next_run_at` vence.
 
-**Envia:**
-- `POST {SCRAPING_API_URL}/scrape` — dispara busca no `scraping.API` (header `x-api-key`)
-- Emails via SMTP: alertas, reset de senha, senha provisória, links de unsubscribe
+Env de scraping: `SCRAPE_INTERVAL_MS` (300000), `SCRAPE_INTERVAL_JITTER_MS` (60000), `SCRAPE_DISPATCH_BATCH` (1).
 
-**Banco:** acessa o PostgreSQL via repositórios internos (pg.Pool). Schema, tabelas e estrutura de dados estão documentados no projeto **flight.DB** — consultar lá para qualquer dúvida sobre colunas, constraints ou migrações.
+## Fluxo de scraping/notificação
 
-## Scheduler interno
+1. Dispatch cria `request_id`, marca job `running`, abre `analysis_runs` e chama o scraper.
+2. Webhook `POST /flight/scrape/results` → `ScrapeService`: salva em `flight_fares`, marca sucesso/falha; bloqueio de IP pausa a companhia; callback órfão reidrata o job por id e salva as fares.
+3. `EvaluationService` (5min) compara tarifas **frescas** (≤48h) contra o target (com margem); rate-limit de 24h por rotina.
+4. `NotificationsService` envia alerta (target batido) e resumo agendado (`scheduled_time`, com catch-up + dedup).
 
-- `scheduleScrapeLoop()` — a cada `SCRAPE_INTERVAL_MS` despacha scrapes para rotinas ativas
-- `scheduleDailyJobs()` — jobs diários (resumos, end-of-period, etc.)
-- Rotina só é despachada se não houver `pending_request_id` válido (< 1h)
+## Integração
 
-## Fluxo de notificação
-
-1. Webhook chega em `POST /flight/scrape/results`
-2. `ScrapeService` processa ofertas, salva em `flight_offers`, atualiza `best_fares`
-3. `NotificationService` avalia se oferta supera target (com margem)
-4. Se sim, `EmailService` envia alerta para email principal + CC emails
-
-## Modos de notificação por rotina
-
-- `alert_only` — só alerta quando target superado
-- `daily_best_and_alert` — resumo diário + alerta
-- `end_of_period` — único email no horário `end_of_period_time`
+Envia: `POST {SCRAPING_API_URL}/scrape` (x-api-key) + emails SMTP. Recebe: `POST /flight/scrape/results` (x-api-key). Banco via `pg.Pool`.

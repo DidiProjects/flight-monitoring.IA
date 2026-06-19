@@ -95,17 +95,16 @@ Get-Content C:\Users\diego\logs\scraping-api\stderr.log -Tail 100
 **POST /scrape** (header `X-API-Key: SCRAPER_API_KEY`)
 
 ```json
-// Request
+// Request — flight.API hoje envia uma data única (outboundStart == outboundEnd),
+// sem trecho de volta (returns foram removidos das rotinas).
 {
   "requestId": "uuid",
-  "routineId": "uuid",
+  "routineId": "uuid",          // = id do scraping_job no flight.API
   "airline": "azul",
   "origin": "VCP",
   "destination": "GRU",
   "outboundStart": "2026-05-25",
-  "outboundEnd": "2026-05-27",
-  "returnStart": "2026-06-01",
-  "returnEnd": "2026-06-03",
+  "outboundEnd": "2026-05-25",
   "passengers": 1
 }
 
@@ -182,7 +181,7 @@ Híbrido:      p.condition
 
 2. **Dois toggles de moeda** — um no painel de busca, outro nos resultados. Sempre usar `.currencySelector button[value="score"]` (não `.first()`)
 
-3. **Anti-detecção** — Camoufox aplica: user-agent spoofing, locale `pt-BR`, timezone `America/Sao_Paulo`, humanização de delays. Se site retornar "comportamento incomum" / "acesso foi limitado", lança erro imediatamente
+3. **Anti-detecção** — Camoufox aplica: user-agent spoofing, locale `pt-BR`, timezone `America/Sao_Paulo`, humanização de delays. Se site retornar "comportamento incomum" / "acesso foi limitado", lança erro imediatamente. `QUEUE_CONCURRENCY` = scrapes em paralelo; com IP único e foco na Azul, valores altos aumentam o risco de bloqueio de IP
 
 4. **NUNCA usar `function f() {}` em `page.evaluate()`** — tsx 4.x com `keepNames:true` injeta `__name` e quebra o contexto do browser. Usar apenas arrow functions `() => {}` ou loops
 

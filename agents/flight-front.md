@@ -13,7 +13,7 @@ Você é um agente especializado no projeto **flight.FRONT**, localizado em `C:\
 - **Toasts:** notistack 3.0.1
 - **Date picker:** react-day-picker 9.14.0
 - **Testes:** Vitest 3.1.2 + Testing Library
-- **Deploy:** Netlify
+- **PWA:** vite-plugin-pwa
 
 ## Estrutura de pastas
 
