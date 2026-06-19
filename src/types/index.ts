@@ -10,6 +10,8 @@ export interface ScraperParams {
   requestId?: string;
   routineId?: string;
   airline?: string;
+  /** Abortado quando o job é cancelado — fecha o browser e desenrola o scraper. */
+  signal?: AbortSignal;
 }
 
 export interface Fare {

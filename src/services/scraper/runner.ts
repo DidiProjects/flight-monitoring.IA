@@ -5,7 +5,8 @@ import { searchFlights as ryanairSearch } from '../../scrapers/ryanair.ts';
 import { buildCallbackPayload, sendResult } from '../result/sender.ts';
 import { createRun, saveResults, saveResponse, pruneOldRuns } from '../../utils/runs.ts';
 import { logger } from '../../utils/logger.ts';
-import { env } from '../../config/env.ts';
+import { abortableSleep, isAbortError } from '../../utils/abortable.ts';
+import { markRunning, markFinishing, unregisterJob } from '../../jobs/registry.ts';
 import type { ScrapeRequest, ScrapeResult } from '../../types/scrape.ts';
 import type { FlightOffer } from '../../types/index.ts';
 
@@ -23,10 +24,11 @@ function categorizeError(err: unknown): string {
   return 'unknown';
 }
 
-export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
+export async function runScrapeJob(request: ScrapeRequest, signal?: AbortSignal): Promise<void> {
   const startTime = Date.now();
   const logCtx = { requestId: request.requestId, routineId: request.routineId, airline: request.airline, origin: request.origin, destination: request.destination };
 
+  markRunning(request.requestId);
   const run = await createRun(request.requestId, request.routineId, request.origin, request.destination);
   logger.info({ ...logCtx, runDir: run.dir }, 'Scrape job started');
 
@@ -38,6 +40,7 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
 
   let flights: FlightOffer[] = [];
   let scraperError: string | undefined;
+  let cancelled = false;
 
   try {
     const scraperParams = {
@@ -52,6 +55,7 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
       requestId:     request.requestId,
       routineId:     request.routineId,
       airline:       request.airline,
+      signal,
     };
 
     const airline = request.airline.toLowerCase();
@@ -60,7 +64,7 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
       if (lastAzulRunAt > 0 && gap < AZUL_MIN_GAP_MS) {
         const wait = AZUL_MIN_GAP_MS - gap;
         logger.info({ ...logCtx, waitMs: wait }, 'Azul cooldown: waiting between consecutive runs');
-        await new Promise(r => setTimeout(r, wait));
+        await abortableSleep(wait, signal);
       }
       lastAzulRunAt = Date.now();
       flights = await azulSearch(scraperParams);
@@ -77,11 +81,26 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
     await saveResults(run, flights);
     logger.info({ ...logCtx, results_count: flights.length, duration_ms: Date.now() - startTime, status: 'success' }, 'Scrape job completed');
   } catch (err) {
-    scraperError = err instanceof Error ? err.message : String(err);
-    await run.saveError(err);
-    logger.error({ ...logCtx, err, error_type: categorizeError(err), duration_ms: Date.now() - startTime, status: 'error' }, 'Scrape job failed');
+    // Cancelamento ≠ falha: não dispara retry e descarta resultado parcial (§15.5).
+    if (signal?.aborted || isAbortError(err)) {
+      cancelled = true;
+      logger.info({ ...logCtx, duration_ms: Date.now() - startTime, status: 'cancelled' }, 'Scrape job cancelled');
+    } else {
+      scraperError = err instanceof Error ? err.message : String(err);
+      await run.saveError(err);
+      logger.error({ ...logCtx, err, error_type: categorizeError(err), duration_ms: Date.now() - startTime, status: 'error' }, 'Scrape job failed');
+    }
   }
 
+  // Job cancelado não envia callback de resultado (não há tarifas; o estado
+  // 'cancelled' será propagado via WS no Stage 3). Só limpa e sai.
+  if (cancelled) {
+    unregisterJob(request.requestId);
+    await pruneOldRuns().catch(() => {});
+    return;
+  }
+
+  markFinishing(request.requestId);
   try {
     await send({
       requestId:   request.requestId,
@@ -96,6 +115,7 @@ export async function runScrapeJob(request: ScrapeRequest): Promise<void> {
   } catch (sendErr) {
     logger.warn({ ...logCtx, err: sendErr instanceof Error ? { message: sendErr.message, code: (sendErr as NodeJS.ErrnoException).code } : sendErr, status: 'error' }, 'Failed to deliver callback to flight.API');
   } finally {
+    unregisterJob(request.requestId);
     await pruneOldRuns().catch(() => {});
   }
 }

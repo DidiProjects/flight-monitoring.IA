@@ -67,9 +67,15 @@ export async function searchFlights(params: ScraperParams): Promise<FlightOffer[
   const browser = await firefox.launch(foxOptions);
   const results: FlightOffer[] = [];
 
+  // Cancelamento real: fechar o browser aborta qualquer operação Playwright em
+  // voo (lança "Target closed"), que desenrola o scraper limpo (features.md §15.3).
+  const onAbort = () => { browser.close().catch(() => {}); };
+  params.signal?.addEventListener('abort', onAbort, { once: true });
+
   const savedCookies = await loadSavedCookies();
 
   try {
+    params.signal?.throwIfAborted();
     const outbound = await searchRoute(
       browser, params.origin, params.destination,
       params.outboundStart, params.outboundEnd ?? params.outboundStart,
@@ -87,7 +93,8 @@ export async function searchFlights(params: ScraperParams): Promise<FlightOffer[
       results.push(...ret);
     }
   } finally {
-    await browser.close();
+    params.signal?.removeEventListener('abort', onAbort);
+    await browser.close().catch(() => {});
   }
 
   return results;
@@ -171,6 +178,7 @@ async function searchRoute(
     let consecutiveEmpty = 0;
 
     for (let i = 0; i < dates.length; i++) {
+      params.signal?.throwIfAborted();
       const date = dates[i]!;
       let dateFlights: FlightOffer[] = [];
 
