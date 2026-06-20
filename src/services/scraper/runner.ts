@@ -7,6 +7,7 @@ import { createRun, saveResults, saveResponse, pruneOldRuns } from '../../utils/
 import { logger } from '../../utils/logger.ts';
 import { abortableSleep, isAbortError } from '../../utils/abortable.ts';
 import { markRunning, markFinishing, unregisterJob } from '../../jobs/registry.ts';
+import { jobStarted, jobProgress, jobFinished } from '../../realtime/telemetry.ts';
 import type { ScrapeRequest, ScrapeResult } from '../../types/scrape.ts';
 import type { FlightOffer } from '../../types/index.ts';
 
@@ -29,6 +30,7 @@ export async function runScrapeJob(request: ScrapeRequest, signal?: AbortSignal)
   const logCtx = { requestId: request.requestId, routineId: request.routineId, airline: request.airline, origin: request.origin, destination: request.destination };
 
   markRunning(request.requestId);
+  jobStarted(request.requestId, { airline: request.airline, origin: request.origin, destination: request.destination, flightDate: request.outboundStart });
   const run = await createRun(request.requestId, request.routineId, request.origin, request.destination);
   logger.info({ ...logCtx, runDir: run.dir }, 'Scrape job started');
 
@@ -64,6 +66,7 @@ export async function runScrapeJob(request: ScrapeRequest, signal?: AbortSignal)
       if (lastAzulRunAt > 0 && gap < AZUL_MIN_GAP_MS) {
         const wait = AZUL_MIN_GAP_MS - gap;
         logger.info({ ...logCtx, waitMs: wait }, 'Azul cooldown: waiting between consecutive runs');
+        jobProgress(request.requestId, 'cooldown', `aguardando ${Math.round(wait / 1000)}s (anti-bot)`);
         await abortableSleep(wait, signal);
       }
       lastAzulRunAt = Date.now();
@@ -80,20 +83,23 @@ export async function runScrapeJob(request: ScrapeRequest, signal?: AbortSignal)
 
     await saveResults(run, flights);
     logger.info({ ...logCtx, results_count: flights.length, duration_ms: Date.now() - startTime, status: 'success' }, 'Scrape job completed');
+    jobFinished(request.requestId, 'success', { faresFound: flights.length, durationMs: Date.now() - startTime });
   } catch (err) {
     // Cancelamento ≠ falha: não dispara retry e descarta resultado parcial (§15.5).
     if (signal?.aborted || isAbortError(err)) {
       cancelled = true;
       logger.info({ ...logCtx, duration_ms: Date.now() - startTime, status: 'cancelled' }, 'Scrape job cancelled');
+      jobFinished(request.requestId, 'cancelled', { durationMs: Date.now() - startTime });
     } else {
       scraperError = err instanceof Error ? err.message : String(err);
       await run.saveError(err);
       logger.error({ ...logCtx, err, error_type: categorizeError(err), duration_ms: Date.now() - startTime, status: 'error' }, 'Scrape job failed');
+      jobFinished(request.requestId, 'failed', { durationMs: Date.now() - startTime, error: scraperError });
     }
   }
 
   // Job cancelado não envia callback de resultado (não há tarifas; o estado
-  // 'cancelled' será propagado via WS no Stage 3). Só limpa e sai.
+  // 'cancelled' já foi propagado via WS acima). Só limpa e sai.
   if (cancelled) {
     unregisterJob(request.requestId);
     await pruneOldRuns().catch(() => {});

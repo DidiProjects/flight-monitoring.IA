@@ -14,6 +14,10 @@ const schema = z.object({
   NODE_ENV:           z.string().default('development'),
   LATAM_CPF:          z.string().optional(),
   LATAM_PASSWORD:     z.string().optional(),
+  // Tempo real (WS worker → hub)
+  REALTIME_ENABLED:   z.string().default('true'),
+  WORKER_ID:          z.string().default('scraper-1'),
+  FLIGHT_API_WS_URL:  z.string().url().optional(),
 });
 
 export const env = schema.parse(process.env);

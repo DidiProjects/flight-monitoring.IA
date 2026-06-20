@@ -6,6 +6,7 @@ import { runScrapeJob } from '../services/scraper/runner.ts';
 import { registerJob, unregisterJob, cancelJob } from '../jobs/registry.ts';
 import { isAbortError } from '../utils/abortable.ts';
 import { logger } from '../utils/logger.ts';
+import { jobQueued } from '../realtime/telemetry.ts';
 
 const ScrapeRequestSchema = z.object({
   requestId:     z.string().uuid(),
@@ -41,6 +42,7 @@ export async function scrapeRoutes(app: FastifyInstance): Promise<void> {
       destination: body.destination,
       flightDate:  body.outboundStart,
     });
+    jobQueued(body.requestId, position);
 
     queue
       .add(({ signal }) => runScrapeJob(body, signal), { signal: handle.controller.signal })
