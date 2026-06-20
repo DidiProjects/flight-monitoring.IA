@@ -38,6 +38,9 @@ Em produção roda no Windows como serviço via NSSM. Em modo serviço (Session 
 | `LOG_PRETTY` | não | `false` | Formatação pretty dos logs |
 | `NODE_ENV` | não | `development` | — |
 | `LATAM_CPF` / `LATAM_PASSWORD` | não | — | Credenciais opcionais da LATAM |
+| `REALTIME_ENABLED` | não | `true` | Liga o canal WS de telemetria/controle com a flight.API |
+| `WORKER_ID` | não | `scraper-1` | Identificador do worker no hub |
+| `FLIGHT_API_WS_URL` | não | derivado de `FLIGHT_API_URL` | Override da URL do WS do hub |
 
 ## API
 
@@ -61,8 +64,24 @@ Body:
 ```
 `returnStart`/`returnEnd` são opcionais. Resposta: `{ "requestId", "position" }`.
 
+### `POST /scrape/:requestId/cancel`
+Header `x-api-key`. Interrompe **de verdade** um job (na fila ou em execução):
+aborta via `AbortController`, fechando o browser Playwright. Responde
+`{ requestId, result }` com `result` ∈ `aborted | queued_removed | not_found`.
+Também acionável pelo hub via comando `cancel` no canal WS.
+
 ### `GET /health`
 `{ "status": "ok", "queue": { "size", "pending" } }`.
+
+## Tempo real (WS worker → hub)
+
+Além do webhook HTTP de resultados, o worker mantém um **WebSocket** (cliente
+nativo do Node) com a flight.API (`/realtime/worker`, dial-out, auth por query
+param `key`=`FLIGHT_API_KEY`). Por ele sobe **telemetria** por job
+(`queued|started|progress|finished`) e descem **comandos de cancelamento**.
+Reconexão com backoff+jitter e reenvio de snapshot. É best-effort: se cair, os
+resultados continuam íntegros (vão pelo webhook). Liga/desliga via
+`REALTIME_ENABLED`. Contrato em `flight-monitoring.IA/contracts/realtime-protocol.ts`.
 
 ## Fila e concorrência
 
