@@ -10,3 +10,4 @@
   3.2 Deselecionar deve ser possível.
 4. Para Rotinas com pontos e dinheiro, deveria ser possível ver dois gráficos em histórico de preços (lado a lado) e duas listas no calendário de preços (uma abaixo da outra).
   4.1 Para rotinas apenas com pontos deveríamos ver só o de pontos.
+5. Eu quero uma análise clara e simples de quando enviamos notificação por email de Preço alvo quando selecionado.
