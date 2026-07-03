@@ -105,9 +105,12 @@ Content-Type: application/json
   "outboundEnd": "2026-06-30",
   "returnStart": "2026-07-01",
   "returnEnd": "2026-07-31",
-  "passengers": 1
+  "passengers": 1,
+  "originCountry": "br",
+  "destinationCountry": "gb"
 }
 ```
+`originCountry`/`destinationCountry` (opcionais) carregam o `country_code` ISO-2 minúsculo de cada aeroporto para decisões por mercado (ex.: British Airways usa a página antiga quando a origem é Brasil).
 
 **Response `202 Accepted`:**
 ```json

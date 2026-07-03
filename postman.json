@@ -26,7 +26,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"requestId\": \"00000000-0000-0000-0000-000000000001\",\n  \"routineId\": \"00000000-0000-0000-0000-000000000002\",\n  \"airline\": \"latam\",\n  \"origin\": \"GRU\",\n  \"destination\": \"CNF\",\n  \"outboundStart\": \"2026-05-30\",\n  \"outboundEnd\": \"2026-05-30\",\n  \"passengers\": 1\n}"
+          "raw": "{\n  \"requestId\": \"00000000-0000-0000-0000-000000000001\",\n  \"routineId\": \"00000000-0000-0000-0000-000000000002\",\n  \"airline\": \"latam\",\n  \"origin\": \"GRU\",\n  \"destination\": \"CNF\",\n  \"outboundStart\": \"2026-05-30\",\n  \"outboundEnd\": \"2026-05-30\",\n  \"passengers\": 1,\n  \"originCountry\": \"br\",\n  \"destinationCountry\": \"br\"\n}"
         }
       }
     },
@@ -41,7 +41,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"requestId\": \"00000000-0000-0000-0000-000000000003\",\n  \"routineId\": \"00000000-0000-0000-0000-000000000002\",\n  \"airline\": \"latam\",\n  \"origin\": \"GRU\",\n  \"destination\": \"CNF\",\n  \"outboundStart\": \"2026-05-30\",\n  \"outboundEnd\": \"2026-05-30\",\n  \"returnStart\": \"2026-06-05\",\n  \"returnEnd\": \"2026-06-05\",\n  \"passengers\": 1\n}"
+          "raw": "{\n  \"requestId\": \"00000000-0000-0000-0000-000000000003\",\n  \"routineId\": \"00000000-0000-0000-0000-000000000002\",\n  \"airline\": \"latam\",\n  \"origin\": \"GRU\",\n  \"destination\": \"CNF\",\n  \"outboundStart\": \"2026-05-30\",\n  \"outboundEnd\": \"2026-05-30\",\n  \"returnStart\": \"2026-06-05\",\n  \"returnEnd\": \"2026-06-05\",\n  \"passengers\": 1,\n  \"originCountry\": \"br\",\n  \"destinationCountry\": \"br\"\n}"
         }
       }
     },
@@ -56,7 +56,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"requestId\": \"00000000-0000-0000-0000-000000000004\",\n  \"routineId\": \"00000000-0000-0000-0000-000000000002\",\n  \"airline\": \"azul\",\n  \"origin\": \"VCP\",\n  \"destination\": \"LIS\",\n  \"outboundStart\": \"2026-05-30\",\n  \"outboundEnd\": \"2026-05-30\",\n  \"passengers\": 1\n}"
+          "raw": "{\n  \"requestId\": \"00000000-0000-0000-0000-000000000004\",\n  \"routineId\": \"00000000-0000-0000-0000-000000000002\",\n  \"airline\": \"azul\",\n  \"origin\": \"VCP\",\n  \"destination\": \"LIS\",\n  \"outboundStart\": \"2026-05-30\",\n  \"outboundEnd\": \"2026-05-30\",\n  \"passengers\": 1,\n  \"originCountry\": \"br\",\n  \"destinationCountry\": \"pt\"\n}"
         }
       }
     }

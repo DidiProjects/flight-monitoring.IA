@@ -59,10 +59,12 @@ Body:
   "outboundEnd": "2026-05-27",
   "returnStart": "2026-06-01",
   "returnEnd": "2026-06-03",
-  "passengers": 1
+  "passengers": 1,
+  "originCountry": "br",
+  "destinationCountry": "gb"
 }
 ```
-`returnStart`/`returnEnd` são opcionais. Resposta: `{ "requestId", "position" }`.
+`returnStart`/`returnEnd` são opcionais. `originCountry`/`destinationCountry` são opcionais (`country_code` ISO-2 minúsculo do aeroporto, ex.: `br`); usados para decidir variações por mercado, ex.: a British Airways usa a página antiga (`flightList`) quando a origem é Brasil. Na ausência, assume origem não-Brasil (página atual). Resposta: `{ "requestId", "position" }`.
 
 ### `POST /scrape/:requestId/cancel`
 Header `x-api-key`. Interrompe **de verdade** um job (na fila ou em execução):
