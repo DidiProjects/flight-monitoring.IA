@@ -5,7 +5,15 @@
 > a carga de scraping nem quebrar o reaproveitamento de tarifas entre usuários.
 >
 > Data: 2026-07-17 · Escopo: `flight.FRONT`, `flight.API`, `flight.DB`, `scraping.API`
-> Status: 🟡 proposta — aguarda **Fase 0** (experimento de decomponibilidade)
+> Status: 🟡 proposta — Fase 0 (experimento) em runbook na `scraping.API`
+>
+> **Decisão de produto (2026-07-17):** a solução vale para **todas as cias,
+> inclusive Azul**, e o desconto RT **pode existir ou não**. Logo a captura do
+> bundle RT (antiga "Fase 2 condicional") **entra no escopo por decisão** — a
+> avaliação será sempre `min(soma_das_pernas, bundle_RT)`: sem desconto,
+> `bundle == soma` e nada muda; com desconto, o bundle ganha. A Fase 0 deixa de
+> decidir *se* implementamos e passa a descobrir *como* a Azul expõe o bundle
+> (URL, fluxo, seletores) e *quanto* o desconto costuma valer.
 
 ---
 
@@ -91,7 +99,13 @@ avulsas dos mesmos voos; comparar.
   sessão só (o input "Datas (Ida e volta)" e a navegação de calendário sugerem que
   sim). Se sim, mesmo o caso não-decomponível custa **~1 sessão**, não 25.
 
-**Saída:** decide se a Fase 2 existe. Documentar o resultado neste arquivo.
+> **Achado do código (2026-07-17):** o scraper Azul **hoje** faz a ida-e-volta como
+> **duas buscas one-way independentes** (`searchFlights` chama `searchRoute` 2×;
+> `buildSearchUrl` só monta `c[0]`). Ou seja, **nunca** captura o bundle RT. O
+> runbook detalhado do experimento vive em `scraping.API/roundtrip-fase0-experimento.md`.
+
+**Saída:** descobrir a URL/fluxo/seletores do bundle RT e o desconto típico.
+Documentar o resultado no runbook e/ou neste arquivo.
 
 ### Fase 1 — Unificar intenção + avaliação decomposta (cobre o caso doméstico)
 
@@ -120,7 +134,7 @@ Mata o 25× e a dupla-rotina. **Coleta permanece por perna → zero mudança em
   - `RoutineCard`: exibe o par + total.
   - Tipos `routines.ts` + `fromApi()` (snake→camel).
 
-### Fase 2 — Capturar a "bundle fare" (SÓ se a Fase 0 provar desconto RT real)
+### Fase 2 — Capturar a "bundle fare" (EM ESCOPO — decisão de produto)
 
 - Guardar a tarifa RT do par `(cia, origem, destino, data_ida, data_volta)` como
   **override**, colhida na **mesma sessão de matriz** (não 25 sessões).
