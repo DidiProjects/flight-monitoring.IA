@@ -55,7 +55,29 @@
       "Bash(New-Item -ItemType File -Path \"C:\\\\Users\\\\diego\\\\Documents\\\\projects\\\\flight.FRONT\\\\.github\\\\workflows\\\\ci.yml\" -Force)",
       "Bash(Out-Null)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(i['name'], '->', [r['name'] for r in i.get\\('item',[]\\)] if 'item' in i else i.get\\('name',''\\)\\) for i in d['item']]\")",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(set -e)",
+      "Bash(sudo mkdir -p -m 755 /etc/apt/keyrings)",
+      "Bash(curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg)",
+      "Bash(sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg)",
+      "Bash(sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg)",
+      "Bash(dpkg --print-architecture)",
+      "Bash(echo \"deb [arch=$\\(dpkg --print-architecture\\) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\")",
+      "Bash(sudo tee /etc/apt/sources.list.d/github-cli.list)",
+      "Bash(sudo apt-get update -qq)",
+      "Bash(sudo apt-get install -y gh)",
+      "Bash(gh --version)",
+      "Bash(gh auth *)",
+      "Bash(docker --version)",
+      "Bash(getent group *)",
+      "Bash(docker compose *)",
+      "Bash(docker info *)",
+      "Bash(systemctl is-active *)",
+      "Bash(systemctl is-enabled *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/health)",
+      "Read(//tmp/**)",
+      "Bash(docker exec *)",
+      "Bash(pkill -f 'tsx.*src/main.ts')"
     ]
   }
 }
