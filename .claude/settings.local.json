@@ -77,7 +77,13 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/health)",
       "Read(//tmp/**)",
       "Bash(docker exec *)",
-      "Bash(pkill -f 'tsx.*src/main.ts')"
+      "Bash(pkill -f 'tsx.*src/main.ts')",
+      "Bash(docker volume *)",
+      "Bash(curl -s -m 5 http://localhost:3011/flight/health -w \"\\\\nHTTP %{http_code}\\\\n\")",
+      "Bash(curl -s -m 10 -X POST http://localhost:3011/flight/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"diego.silva.lv93@gmail.com\",\"password\":\"changeme123\"}' -w \"\\\\nHTTP %{http_code}\\\\n\")",
+      "Bash(curl -s -m 5 http://localhost:3000/health -w \"\\\\nHTTP %{http_code}\\\\n\")",
+      "Bash(awk 'NR>13' /tmp/scraper-logs/scraper.log)",
+      "Bash(awk 'NR>21' /tmp/scraper-logs/scraper.log)"
     ]
   }
 }
