@@ -117,8 +117,11 @@ disso, o **mesmo preço absoluto** pode alertar de novo para uma data futura.
 **Leitura:** discutível. A oferta barata antiga expirou, então notificar uma nova
 data barata é informação legítima. Mas tecnicamente é "mesmo preço de novo".
 
-**Status:** ⬜ decisão pendente — manter como está (recomendado) ou guardar um
-piso histórico independente de data.
+**Status:** ✅ decidido em 2026-07-24 — **manter como está**. A oferta barata
+antiga expirou de fato, então alertar sobre uma data futura barata é informação
+legítima. A alternativa (piso histórico independente de data) foi descartada: o
+piso só desceria com o tempo e a rotina tenderia a parar de alertar. Nenhum
+código a mudar.
 
 ---
 
@@ -148,5 +151,5 @@ ou serializar `runCycle` com um lock de aplicação (advisory lock).
 - [x] Datas novas no mesmo preço não spammam — gate `routineFloor` (commit `8367df4`)
 - [x] Sem sobreposição de ciclos (single-instance) — `arm()` no `finally`
 - [x] Furo 1 — ordenação alinhada (preço asc, empate scraped_at) — sem efeito colateral
-- [ ] Furo 2 — decisão sobre reset de piso no cleanup
+- [x] Furo 2 — decidido: manter o reset de piso no cleanup (sem código)
 - [ ] Furo 3 — atomicidade do gate se escalar para multi-réplica

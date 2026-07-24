@@ -148,20 +148,32 @@ Mata o 25× e a dupla-rotina. **Coleta permanece por perna → zero mudança em
 
 ---
 
-## 5. Edge cases e decisões em aberto
+## 5. Edge cases e decisões
 
-- **Acoplamento de datas (min/max-stay):** se o produto exigir "mínimo N noites",
-  a avaliação não pode fazer `min(ida)+min(volta)` livre — precisa iterar as 25
-  combinações válidas (barato em memória). Decidir se essa restrição existe.
-- **Cias diferentes por perna:** ida numa cia, volta em outra (RT "self-transfer").
-  Permitir? Se sim, RT decomposto lida naturalmente; bundle não.
-- **Moeda:** `airports` define moeda por origem. Ida e volta podem ter origens em
-  moedas diferentes (internacional) — total RT precisa normalizar moeda.
+> **Decisões fechadas em 2026-07-24.** Os três itens que bloqueavam o DDL da
+> Fase 1 (§7 passo 3) estão resolvidos.
+
+- ✅ **Acoplamento de datas (max-stay): teto de 3 meses entre ida e volta.**
+  Não há mínimo de noites e não é configurável por rotina — é uma constante da
+  aplicação (`MAX_ROUNDTRIP_SPAN_MONTHS = 3` em `flight.API/src/utils/`).
+  Consequência: **nenhuma coluna nova de min/max-stay no DDL**; a avaliação
+  itera as combinações `(ida, volta)` e descarta as que excedem o teto.
+- ✅ **Cias diferentes por perna: não permitido — as duas pernas na mesma
+  companhia.** Motivo: só assim o desconto RT é identificável (o bundle da
+  Fase 2 exige par da mesma cia). A avaliação agrupa por companhia e compara
+  pares dentro de cada uma.
+  - **Perna faltando:** se a análise de um trajeto de duas pernas retornar
+    apenas uma perna, a análise é **ignorada** (não avalia, não alerta) e emite
+    um **erro específico para o Grafana** — par RT incompleto é dado corrompido,
+    não uma oferta barata.
+- ✅ **Moeda: só avalia o par quando as duas pernas têm a mesma moeda.**
+  Sem conversão de câmbio e sem taxa para versionar. Par com moedas diferentes
+  fica fora da avaliação RT; cada perna segue avaliada como one-way.
 - **Prioridade cash/pts/hyb:** o par precisa ser comparado na mesma dimensão de
   preço da rotina (`priority`). Somar/comparar cash com cash, pts com pts.
 - **`cleanupPastDates` no RT:** quando a data de **ida** vira passado mas a de volta
-  ainda é futura (ou vice-versa), o par inteiro expira. Alinhar com o Furo 2 do
-  `target-alert-ajustes.md`.
+  ainda é futura (ou vice-versa), o par inteiro expira. Alinhado com o Furo 2 do
+  `target-alert-ajustes.md`, cuja decisão foi **manter o comportamento atual**.
 - **One-way não regride:** `trip_type='one_way'` deve seguir idêntico ao fluxo
   atual — a Fase 1 é aditiva.
 
@@ -181,6 +193,9 @@ Mata o 25× e a dupla-rotina. **Coleta permanece por perna → zero mudança em
 ## 7. Próximos passos
 
 1. ⬜ **Fase 0** — rodar o experimento de decomponibilidade na Azul e registrar o
-   número aqui (§2).
-2. ⬜ Se decomponível → implementar **Fase 1** e encerrar. Se não → Fase 1 + Fase 2.
-3. ⬜ Fechar as decisões em aberto de §5 (min-stay, cias mistas, moeda) antes do DDL.
+   número aqui (§2). **Manual** (DevTools no site) e bloqueia **só a Fase 2** —
+   a decisão de produto de 2026-07-17 já garantiu que a Fase 1 acontece nos dois
+   cenários (§7 passo 2 original: "se decomponível → Fase 1; se não → Fase 1 + 2").
+2. 🟡 **Fase 1** — em implementação desde 2026-07-24, destravada pelo passo 3.
+3. ✅ Decisões de §5 fechadas (max-stay de 3 meses, mesma cia nas duas pernas,
+   mesma moeda) — o DDL está liberado.
