@@ -166,6 +166,18 @@ Mata o 25× e a dupla-rotina. **Coleta permanece por perna → zero mudança em
     apenas uma perna, a análise é **ignorada** (não avalia, não alerta) e emite
     um **erro específico para o Grafana** — par RT incompleto é dado corrompido,
     não uma oferta barata.
+- ✅ **Volta indefinida por limitação conhecida (2026-07-25): exibe, não
+  alerta.** Em pontos a Azul abre modal de login do TudoAzul ao selecionar a
+  tarifa e a volta fica inacessível. A volta **existe** — só não conseguimos
+  vê-la, o que é diferente de par corrompido. O par aparece com total "—" e
+  **nunca dispara e-mail**: se a volta é desconhecida, o preço da ida não é o
+  preço da viagem, e alertar sobre ele anunciaria um valor que não existe
+  ("achamos por R$ 365" quando a viagem custa R$ 931+).
+
+  | Situação | Tratamento |
+  |---|---|
+  | Volta indisponível por limitação conhecida (login) | tolera, exibe "—", **não** reporta, **não** alerta |
+  | Volta sumiu sem motivo (fallback one-way, DOM mudou) | descarta + `IncompleteRoundTripError` no Grafana |
 - ✅ **Moeda: só avalia o par quando as duas pernas têm a mesma moeda.**
   Sem conversão de câmbio e sem taxa para versionar. Par com moedas diferentes
   fica fora da avaliação RT; cada perna segue avaliada como one-way.

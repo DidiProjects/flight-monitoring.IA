@@ -1,170 +1,190 @@
 # Round-Trip — Onde Paramos
 
-> Estado em **2026-07-24**, fim da sessão. Continuação do `roundtrip-design.md`.
-> Tudo descrito aqui está **commitado e pushado**.
+> Estado em **2026-07-25**. Continuação do `roundtrip-design.md`.
+> Tudo descrito aqui está **commitado**.
 
 ---
 
 ## 1. Situação em uma frase
 
-A Fase 1 (ida-e-volta como UMA rotina) está **completa e validada**. A coleta
-passou de perna avulsa para **par de datas**, e a busca RT real na Azul funciona.
-Falta ligar o **laço 1-para-N** das voltas e tratar a **volta indefinida**.
+O laço **1-para-N** está ligado ponta a ponta (scraper → contrato → banco →
+avaliação → card) e a **volta indefinida** está tratada. Falta a validação
+end-to-end contra o site real e a decisão sobre o gargalo.
 
 ---
 
-## 2. Commits desta sessão
+## 2. Commits
 
-| Repo | Branch | Commit | PR |
-|------|--------|--------|-----|
-| flight.DB | `feat/roundtrip-analysis` | `bad6a40` | [#3](https://github.com/DidiProjects/flight.DB/pull/3) → develop |
-| flight.API | `feat/roundtrip-analysis` | `38d09ce` | [#22](https://github.com/DidiProjects/flight.API/pull/22) → develop |
-| flight.FRONT | `feat/roundtrip-analysis` | `0aee530` | [#11](https://github.com/DidiProjects/flight.FRONT/pull/11) → develop |
-| scraping.API | `feat/roundtrip-experiment` | `5c6af80` | PR aberto → develop |
-| flight-monitoring.IA | `feat/roundtrip-analysis` | `91e5c59` | [#1](https://github.com/DidiProjects/flight-monitoring.IA/pull/1) → **main** (não tem develop) |
+### Sessão 2026-07-24 (Fase 1)
 
-Migrations aplicadas **só no banco local**. Produção intocada.
+| Repo | Branch | Commit |
+|------|--------|--------|
+| flight.DB | `feat/roundtrip-analysis` | `bad6a40` |
+| flight.API | `feat/roundtrip-analysis` | `38d09ce` |
+| flight.FRONT | `feat/roundtrip-analysis` | `0aee530` |
+| scraping.API | `feat/roundtrip-experiment` | `5c6af80` |
+
+### Sessão 2026-07-25 (4.1 laço 1-para-N + 4.2 volta indefinida)
+
+| Repo | 4.1 | 4.2 |
+|------|-----|-----|
+| scraping.API | `f1396f9` | (ver git log) |
+| flight.API | `ef4db33` | (ver git log) |
+| flight.DB | `8ea11a5` (migration 010) | migration 011 |
+| flight.FRONT | — | card mostra "—" |
+
+Migrations aplicadas **só no banco local** (010 e 011 conferidas no
+`pg_indexes`/`information_schema`, não só no log). Produção intocada.
 
 ---
 
 ## 3. O que está pronto
 
-### Banco (migrations 001–009)
-- `001`–`005`: convergência de schema (havia drift nos dois sentidos)
-- `006`: `routines.trip_type` + `inbound_start`/`inbound_end`
-- `007`: `scraping_jobs.return_date` + chave `UNIQUE NULLS NOT DISTINCT`;
-  `flight_fares.return_date` + `bundle_*`; `analysis_runs.return_date`
-- `008`: `airlines.has_roundtrip` (só Azul)
-- `009`: `flight_fares.paired_outbound_flight` — a coluna do 1-para-N, **criada
-  mas ainda não preenchida por ninguém**
+### O laço 1-para-N (4.1)
 
-### flight.API
-- Jobs de RT derivados do produto cartesiano das janelas (`ib >= ob`, teto 3 meses)
-- `getLatestByRoute` com filtro de par **obrigatório** (`null` = só avulsa)
-- `getCurrentBest` / `getPriceByDate` também filtram (tinham o mesmo vazamento)
-- `getLatestPairs` + avaliação com `min(bundle, soma)`
-- `return_date` carimbado **a partir do job**, não do callback
-- Total do par no `/fares/current`, no e-mail e no resumo agendado
-- Deep link vira busca ida-e-volta
-- 93 testes
+As voltas são precificadas **no contexto da ida escolhida**. Não existe "a lista
+de voltas" — existe uma lista por ida.
 
-### scraping.API
-- `buildSearchUrl` monta `c[1]`; `searchFlights` faz UMA busca RT
-- Perna decidida **por card** (IATA invertido), com a data de volta correta
-- `src/scrapers/azulRoundTrip.ts` — módulo do fluxo 1-para-N, **pronto mas não
-  ligado**
-- 53 testes
+- `azulParse.ts`: o parsing de card→`FlightOffer` saiu de dentro do
+  `collectAllFares`. Módulo puro, sem playwright — testável de verdade, em vez da
+  cópia da lógica que os testes mantinham.
+- `parseCards` preserva o vínculo oferta↔card. O parser descarta cards (sem
+  horário, sem duração, duplicados), então casar por índice de array depois do
+  descarte abriria as voltas da ida errada.
+- `azulRoundTrip.ts` virou só navegação; `openReturnsForOutbound` devolve **o
+  motivo** da falha em vez de uma lista vazia ambígua.
+- `collectRoundTripFares`: por ida, abre as voltas, parseia e volta com `goBack`.
+  A tarifa de ida é selecionada em **reais** — em pontos a Azul exige login.
+- Avaliação: `total(O) = tarifa(O) + min(tarifa(R) : R.paired_outbound_flight = O)`.
+  Coleta anterior ao carimbo cai no comportamento antigo, senão o que já está no
+  banco pararia de ser avaliado.
 
-### flight.FRONT
-- Ida-e-volta vira UMA rotina (antes criava duas e queimava 2 das 10 vagas)
-- Card mostra `GRU ✈ CNF ✈ GRU`, datas "Ida"/"Volta" e pede o total do par
-- 42 testes
+### Volta indefinida (4.2)
+
+- `detectLoyaltyLoginWall` é conservador de propósito: só afirma "login" com
+  campo de senha ou diálogo falando de TudoAzul. Confundir "volta sumiu" com
+  "precisa de login" transformaria corrupção em par tolerado em silêncio.
+- `flight_fares.inbound_unavailable` (migration 011), marcada só na **ida**.
+- Avaliação tolera nos **dois níveis**: par sem nenhuma volta, e ida específica
+  sem volta vinculada. Tolerado = log info, sem Grafana, **sem total, sem alerta**.
+- `/fares/current` devolve `inbound_unavailable` e o card mostra **"—" + "volta
+  não disponível"**, em vez do enganoso "sem preço coletado ainda".
+
+### Testes
+
+| Repo | Antes | Agora |
+|------|-------|-------|
+| scraping.API | 53 | 82 |
+| flight.API | 93 | 119 (13 arquivos, integração incluída) |
+| flight.FRONT | 42 | 46 |
+
+Integração roda contra Postgres real:
+`TEST_DATABASE_URL="postgres://admin:admin123@localhost:5433/dev-flightDB" npm test`
 
 ---
 
-## 4. O que falta — em ordem
+## 4. Bugs encontrados no caminho
 
-### 4.1 Ligar o laço 1-para-N (scraping.API)
+### 4.1 O par nunca fechava (corrigido — era bloqueante)
 
-**O modelo:** as voltas são precificadas **no contexto da ida escolhida**. Não
-existe "a lista de voltas" — existe uma lista por ida. É por isso que o desconto
-RT pode existir.
+O par era casado por `flight_date`, mas a perna de volta carrega **a data dela**,
+não a da ida. As duas pernas caíam em grupos diferentes e **todo par real era
+descartado como incompleto** — a avaliação RT jamais produziria um total.
 
-O módulo `azulRoundTrip.ts` já tem as quatro peças (`readSectionCards`,
-`openReturnsForOutbound`, `ensureOnlyPoints`, `backToOutbound`).
+A identidade do par é o **`request_id`**: as duas pernas saem da mesma busca.
+`getLatestPairs` e `getCurrentBestPair` agora casam por request_id e expõem
+`pair_outbound_date` (vindo da perna de ida).
 
-**O que trava:** o parsing de preço, duração e número do voo vive **inline dentro
-do `collectAllFares`** (`src/scrapers/azul.ts`). Precisa ser extraído para poder
-ser reusado no laço.
+**Por que os testes não pegaram:** o fixture `pair()` dava o mesmo `flight_date`
+às duas pernas — codificava exatamente a suposição errada. Corrigido, e agora há
+teste de integração contra Postgres real que reproduz o formato verdadeiro.
 
-Passos:
-1. Extrair o parsing card→`FlightOffer` do `collectAllFares` para uma função própria
-2. Escrever `collectRoundTripFares`: lê idas da 1ª section → para cada ida,
-   `openReturnsForOutbound` → parseia voltas → `backToOutbound`
-3. `FlightOffer` ganha `pairedOutboundFlight`; preencher nas voltas
-4. Propagar pelo contrato até `toFareRows` no flight.API (a coluna já existe)
-5. Avaliação passa a agrupar por **ida**, não por data:
-   `total(O) = tarifa(O) + min(tarifa(R) : R.paired_outbound_flight = O)`
+### 4.2 O dedup colapsaria o 1-para-N (corrigido, migration 010)
 
-**Atenção:** a 2ª `section.card-list` traz 2 voltas de prévia que **não são
-necessariamente as melhores**. Ignorar. Foi o erro da primeira implementação.
+A chave era `(request_id, flight_date, is_return, flight_number)`. A **mesma
+volta** aparece na lista de várias idas com preço diferente em cada uma — o
+mecanismo do desconto. O `ON CONFLICT DO NOTHING` guardaria só a primeira: o laço
+rodaria e o dado não existiria. `paired_outbound_flight` entrou na chave.
 
-### 4.2 Volta indefinida (decisão pendente + implementação)
+### 4.3 Testes de integração quebrados desde a sessão anterior (corrigido)
 
-Em **pontos**, ao selecionar a tarifa a Azul abre modal de login do programa de
-fidelidade e a volta fica inacessível.
+O schema-espelho do `FlightFaresRepository.integration.test.ts` era de `3c70e79`
+e não tinha `return_date` — os 4 testes falhavam desde `38d09ce`. Passam
+despercebidos localmente porque são pulados sem `TEST_DATABASE_URL`; **no CI, que
+define a var, estavam falhando**. Espelho atualizado + 5 testes de par novos.
 
-**Conflito a resolver:** a decisão de 2026-07-24 (§5 do design) diz que par com
-uma perna só é **descartado** e reportado ao Grafana (`IncompleteRoundTripError`,
-já implementado). O pedido novo é **tolerar** e exibir "-".
+### 4.4 `parseBrlAmount` 100x (NÃO corrigido — de propósito)
 
-Reconciliação proposta:
+Sem separador decimal o valor sai 100x maior (`"R$2.84350"` → 284350). Na prática
+o card traz a vírgula num `<span class="decimal">`, então o `innerText` sempre tem
+separador. Fixado em teste e documentado. Não "consertei" às cegas: um palpite
+errado aqui transformaria preços corretos em preços 100x errados, e não há como
+validar contra o site (IP bloqueado).
 
-| Situação | Tratamento |
-|---|---|
-| Volta indisponível por limitação conhecida (pontos/login) | tolera, exibe "-", **não** reporta |
-| Volta sumiu sem motivo (fallback one-way, DOM mudou) | descarta + Grafana, como hoje |
+---
 
-**Ponto crítico, ainda não decidido:** se a volta é desconhecida, o preço da ida
-**não é o preço da viagem**. Comparar só a ida contra o `target_cash` dispararia
-alerta num valor que não existe ("achamos por R$ 365" quando a viagem custa
-R$ 931+).
+## 5. O que falta
 
-Recomendação: par incompleto **exibe mas não alerta**. Se for para alertar, o
-e-mail precisa dizer "volta não disponível — valor parcial".
+### 5.1 Validação contra o site real (o próximo passo)
 
-### 4.3 O gargalo (só estudar)
+Nada do laço 1-para-N foi exercido contra a Azul de verdade — o IP daqui está
+bloqueado ("Ops! Só um momento. Identificamos um comportamento incomum vindo do
+seu IP"). Precisa rodar de onde o acesso está liberado.
 
-- Rotina RT com janela 30×30 dias → **900 jobs** (contra 60 no modelo por perna)
+O que só o site pode responder:
+- o `goBack` realmente recarrega a lista de idas N vezes seguidas, ou a sessão
+  se perde depois de algumas?
+- `detectLoyaltyLoginWall` acerta o modal real? (os seletores são heurística
+  conservadora, não confirmação)
+- quanto tempo custa uma busca RT com N idas?
+
+### 5.2 O gargalo (decisão pendente)
+
+- Rotina RT com janela 30×30 → **900 jobs**
 - Cada job agora exige **N navegações** (uma por ida) com `goBack` entre elas
-- Tudo isso com `batch=1` e IP único
+- Tudo com `batch=1` e IP único
+
+**Não pus teto no número de idas de propósito:** um cap jogaria fora o dado das
+idas cortadas e criaria falsos "par incompleto". A decisão é de produto.
 
 Ideias não avaliadas: limitar a janela de RT, capar pares por rotina, priorizar
 só as datas mais promissoras.
 
+### 5.3 Bundle (Fase 2)
+
+`flight_fares.bundle_*` existe e **está sempre nulo** — ninguém preenche. A
+avaliação usa `min(bundle, soma)`, então hoje é sempre a soma das duas pernas da
+mesma busca RT. Correto como fallback, mas não captura desconto explícito.
+
 ---
 
-## 5. Decisões de produto já fechadas (2026-07-24)
+## 6. Decisões de produto fechadas
 
-- **Max-stay: 3 meses** entre ida e volta. Constante da aplicação
-  (`MAX_ROUNDTRIP_SPAN_MONTHS` em `flight.API/src/utils/roundtrip.ts`), não é
-  coluna nem configurável por rotina.
+- **Max-stay: 3 meses** entre ida e volta (`MAX_ROUNDTRIP_SPAN_MONTHS`), constante
+  da aplicação, não coluna.
 - **Mesma companhia** nas duas pernas — só assim o desconto é identificável.
-  Rotina RT exige `airlines.has_roundtrip` (hoje só Azul).
 - **Mesma moeda** nas duas pernas; par com moedas diferentes não é avaliado.
-- **Furo 2** do `target-alert-ajustes.md`: manter o comportamento atual do
-  `cleanupPastDates`. Fechado, sem código.
+- **Volta indefinida (2026-07-25): exibe "—", não alerta.** Se a volta é
+  desconhecida, o preço da ida não é o preço da viagem.
+- **Furo 2** do `target-alert-ajustes.md`: mantido o comportamento atual.
 
 ---
 
-## 6. Armadilhas que já custaram caro
+## 7. Armadilhas que já custaram caro
 
 1. **`__name is not defined`** — nada de função nomeada dentro de `page.evaluate`.
-   Atribuir arrow a `const` **também conta** como nomear. Usar inline puro.
-   (Está no `CLAUDE.md` do scraping.API; ainda assim tropecei duas vezes.)
-2. **IP bloqueado pela Azul** — "Ops! Só um momento. Identificamos um
-   comportamento incomum vindo do seu IP." Validação real do scraper depende de
-   rodar de onde o acesso está liberado. Não insistir em tentativas.
-3. **PATCH parcial** devolvia 500 (bug pré-existente, corrigido): `undefined` =
-   não tocar, `null` explícito = limpar.
-4. **`NULL != NULL`** em UNIQUE: sem `NULLS NOT DISTINCT`, cada job one-way
-   viraria linha nova a cada upsert.
-5. **Migration/edição que "aplicou" sem aplicar** — um script abortou num assert
-   antes de gravar e o ramo de par nunca chegou ao arquivo. Só apareceu na
-   validação end-to-end. **Sempre conferir o resultado, não o log do script.**
-
----
-
-## 7. Fase 0 e Fase 2
-
-A Fase 0 (medir se o preço é decomponível) **nunca foi rodada** formalmente, mas
-a sessão descobriu empiricamente o que ela buscava: URL, seletores e o fluxo
-1-para-N. O que continua desconhecido é o **total consolidado do par (bundle)** —
-`flight_fares.bundle_*` existe e está sempre nulo.
-
-Enquanto isso a avaliação usa a **soma das duas pernas da mesma busca RT**, que é
-o fallback correto do `min(bundle, soma)`. Não captura desconto, mas nunca mistura
-com tarifa avulsa.
+   Atribuir arrow a `const` **também conta**. Usar inline puro.
+2. **IP bloqueado pela Azul** — validação real depende de rodar de onde o acesso
+   está liberado. Não insistir em tentativas.
+3. **`NULL != NULL`** em UNIQUE: sem `NULLS NOT DISTINCT`, cada upsert de ida
+   viraria linha nova.
+4. **Migration/edição que "aplicou" sem aplicar** — sempre conferir o resultado
+   (`pg_indexes`, `information_schema`), não o log do script.
+5. **Fixture que codifica a suposição errada** — o par com `flight_date` igual nas
+   duas pernas fez 30+ testes passarem sobre um bug que impedia a feature de
+   funcionar. Quando o teste é o único juiz, ele precisa refletir o formato REAL
+   do dado. Foi o teste de integração contra Postgres que revelou.
+6. **`cd x && cmd` no Bash** dispara prompt de permissão; usar `git -C <path>`.
 
 ---
 
@@ -172,7 +192,6 @@ com tarifa avulsa.
 
 1. Ler este arquivo e `roundtrip-design.md`
 2. Ler `scraping.API/memory/azul/dom-structure.md`, seção **"Busca ida-e-volta (RT)"**
-   — todos os seletores confirmados estão lá
 3. Subir a stack: `docker compose up -d` em flight.DB e flight.API;
    `npm run dev` em scraping.API e flight.FRONT
-4. Começar por **4.1**, que destrava o resto
+4. Começar por **5.1** — sem o site real, o resto é teoria
