@@ -1,15 +1,37 @@
 # Round-Trip — Onde Paramos
 
-> Estado em **2026-07-25**. Continuação do `roundtrip-design.md`.
+> Estado em **2026-08-01**. Continuação do `roundtrip-design.md`.
 > Tudo descrito aqui está **commitado**.
 
 ---
 
 ## 1. Situação em uma frase
 
-O laço **1-para-N** está ligado ponta a ponta (scraper → contrato → banco →
-avaliação → card) e a **volta indefinida** está tratada. Falta a validação
-end-to-end contra o site real e a decisão sobre o gargalo.
+O laço **1-para-N funcionou contra o site real** (5 idas × 5 voltas, zero
+falhas) e o total já aparece segregado em ida e volta. Falta decidir o gargalo —
+e a primeira coleta real levantou a suspeita de que o desconto RT pode não
+existir na rota testada.
+
+---
+
+## 1.1 A corrida que fechou o ciclo — 2026-08-01
+
+`GRU→CNF 21/09` com volta `25/09`, 5 idas, **25 voltas**, nenhum snapshot de
+erro. Parse conferido contra o HTML do snapshot: bate.
+
+| Perna | Melhor |
+|---|---|
+| Ida | AD2881 21:40 — R$ 416,65 |
+| Volta | AD2724 / AD2880 / AD4212 — R$ 467,05 |
+| **Par** | **R$ 883,70** |
+
+⚠ **As 5 idas devolveram voltas com preços idênticos.** Não é releitura: são
+voltas de verdade (CNF→GRU), são 5 e não 2, e os valores diferem da prévia. O
+desconto 1-para-N simplesmente **não se manifestou nesta rota/data**.
+
+Se isso se repetir, o laço paga N navegações para obter a mesma lista N vezes —
+e aí dá para detectar que a lista não mudou e cortar na segunda ida. **Precisa
+de 2 ou 3 rotas a mais antes de virar código.**
 
 ---
 
@@ -33,8 +55,20 @@ end-to-end contra o site real e a decisão sobre o gargalo.
 | flight.DB | `8ea11a5` (migration 010) | migration 011 |
 | flight.FRONT | — | card mostra "—" |
 
+### Sessão 2026-08-01 (validação real + segregação + RT só em dinheiro)
+
+| Repo | Commit |
+|------|--------|
+| scraping.API | `6206a85` |
+| flight.API | `60644fb` |
+| flight.FRONT | `2e8c4a7` |
+| flight.DB | `9f43cbd` (migration 012) |
+
 Migrations aplicadas **só no banco local** (010 e 011 conferidas no
-`pg_indexes`/`information_schema`, não só no log). Produção intocada.
+`pg_indexes`/`information_schema`, não só no log; a 012 afetou 0 linhas porque a
+única rotina RT já estava em `cash`). Produção intocada.
+
+Testes: scraping.API 98 · flight.API 125 · flight.FRONT 46.
 
 ---
 
@@ -125,27 +159,39 @@ validar contra o site (IP bloqueado).
 
 ## 5. O que falta
 
-### 5.1 Validação contra o site real (o próximo passo)
+### 5.1 Validação contra o site real — ✅ FEITA (2026-08-01)
 
-Nada do laço 1-para-N foi exercido contra a Azul de verdade — o IP daqui está
-bloqueado ("Ops! Só um momento. Identificamos um comportamento incomum vindo do
-seu IP"). Precisa rodar de onde o acesso está liberado.
+Rodou. O que o site respondeu, e que nenhum teste tinha como antecipar:
 
-O que só o site pode responder:
-- o `goBack` realmente recarrega a lista de idas N vezes seguidas, ou a sessão
-  se perde depois de algumas?
-- `detectLoyaltyLoginWall` acerta o modal real? (os seletores são heurística
-  conservadora, não confirmação)
-- quanto tempo custa uma busca RT com N idas?
+- **"Selecionar tarifa" já troca a tela para as voltas.** O rodapé "Continuar"
+  só aparece quando não havia nada a selecionar. Exigi-lo sempre abortava o laço
+  **já estando na lista de voltas**.
+- **`button.btn-fare` tem `pointer-events: none`** no CSS base; o desktop devolve
+  só o `display`. Clicar nele espera uma actionability que nunca chega.
+- **`goBack` foi substituído** por "Trocar esse voo" no cabeçalho da perna.
+- **A ida escolhida continua na tela das voltas**, com a mesma rota e um
+  `btn-fare` ("Alterar tarifa") — daí "voltamos?" exigir a perna de ida **sem
+  voo escolhido**.
+- **Dois toggles de moeda na página.** Só o `div.currencySelector` da lista
+  repreça os cards, e ele **não existe** na tela de voltas.
+- `detectLoyaltyLoginWall` **não foi exercido**: com a ida em reais o modal não
+  apareceu. Segue heurística não confirmada.
 
-### 5.2 O gargalo (decisão pendente)
+Tudo em `scraping.API/memory/azul/dom-structure.md`.
+
+### 5.2 O gargalo (decisão pendente — agora com dado real)
 
 - Rotina RT com janela 30×30 → **900 jobs**
-- Cada job agora exige **N navegações** (uma por ida) com `goBack` entre elas
+- Cada job exige **N navegações** (uma por ida), com "Trocar esse voo" entre elas
 - Tudo com `batch=1` e IP único
 
 **Não pus teto no número de idas de propósito:** um cap jogaria fora o dado das
 idas cortadas e criaria falsos "par incompleto". A decisão é de produto.
+
+⚠ A corrida de 2026-08-01 dá um argumento novo: as 5 idas renderam **a mesma
+lista de voltas**. Se isso for a regra, o custo de N navegações compra dado
+repetido, e o corte natural é parar quando a lista de voltas não muda. Confirmar
+em outras rotas antes.
 
 Ideias não avaliadas: limitar a janela de RT, capar pares por rotina, priorizar
 só as datas mais promissoras.
@@ -166,6 +212,12 @@ mesma busca RT. Correto como fallback, mas não captura desconto explícito.
 - **Mesma moeda** nas duas pernas; par com moedas diferentes não é avaliado.
 - **Volta indefinida (2026-07-25): exibe "—", não alerta.** Se a volta é
   desconhecida, o preço da ida não é o preço da viagem.
+- **RT só em dinheiro (2026-08-01, TEMPORÁRIA).** Com a ida escolhida em reais a
+  Azul não oferece a troca de moeda na tela de voltas, então a volta nunca tem
+  `fare_pts`. Rotina RT em pts/híbrido é recusada no front e no back; migration
+  012 saneia as existentes. Cai quando a volta em pontos for obtível.
+- **Total exibido segregado (2026-08-01):** ida e volta do par vencedor, nulas
+  quando o total vem de bundle. As parcelas vêm sempre da MESMA combinação.
 - **Furo 2** do `target-alert-ajustes.md`: mantido o comportamento atual.
 
 ---
@@ -185,6 +237,13 @@ mesma busca RT. Correto como fallback, mas não captura desconto explícito.
    funcionar. Quando o teste é o único juiz, ele precisa refletir o formato REAL
    do dado. Foi o teste de integração contra Postgres que revelou.
 6. **`cd x && cmd` no Bash** dispara prompt de permissão; usar `git -C <path>`.
+7. **Um passo do fluxo que "faltava" pode ser um passo que sobra.** O "Continuar"
+   foi adicionado para destravar um caso e virou o próprio bloqueio no caso
+   normal. Antes de exigir um controle, perguntar se o objetivo dele já não
+   aconteceu — e tratar ausência como informação, não como falha.
+8. **Elemento certo, lugar errado.** Havia dois toggles de moeda; o fallback
+   global pegava o do formulário de busca, clicava, não repreçava nada e ainda
+   pagava 15s por ida. Fallback que amplia o escopo do seletor acerta silêncio.
 
 ---
 
@@ -194,4 +253,6 @@ mesma busca RT. Correto como fallback, mas não captura desconto explícito.
 2. Ler `scraping.API/memory/azul/dom-structure.md`, seção **"Busca ida-e-volta (RT)"**
 3. Subir a stack: `docker compose up -d` em flight.DB e flight.API;
    `npm run dev` em scraping.API e flight.FRONT
-4. Começar por **5.1** — sem o site real, o resto é teoria
+4. Rodar **2 ou 3 rotas RT diferentes** e comparar as listas de voltas entre as
+   idas. É isso que decide o §5.2: se a lista nunca muda, o laço N-navegações
+   compra dado repetido e o corte é natural.

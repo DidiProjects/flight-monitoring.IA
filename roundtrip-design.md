@@ -181,6 +181,34 @@ Mata o 25× e a dupla-rotina. **Coleta permanece por perna → zero mudança em
 - ✅ **Moeda: só avalia o par quando as duas pernas têm a mesma moeda.**
   Sem conversão de câmbio e sem taxa para versionar. Par com moedas diferentes
   fica fora da avaliação RT; cada perna segue avaliada como one-way.
+- ✅ **Round-trip da Azul só existe em dinheiro (2026-08-01).** A volta nunca terá
+  preço em pontos neste fluxo, e isso não é bug a consertar.
+
+  A ida é selecionada em **reais** de propósito — em pontos a Azul exige login do
+  TudoAzul e a volta fica inacessível. Escolhida a tarifa de ida, a moeda da
+  reserva fica definida: a Azul **deixa de renderizar** o seletor de moeda da
+  lista (`div.currencySelector`) na tela de voltas. Só sobra o do formulário de
+  busca, que não repreça a lista.
+
+  Consequência: `fare_pts`/`fare_hyb_*` das voltas ficam nulos, e uma rotina RT
+  com `priority` em `pts` ou `hyb` **não fecha total**. Cai no mesmo tratamento
+  da volta indefinida: exibe "—", não alerta.
+
+  ⚠ Já custou uma corrida: o fallback global do `setCurrencyView` clicava no
+  toggle do formulário, não repreçava nada e ainda pagava ~15s por ida
+  esperando uma confirmação impossível.
+- ✅ **Total exibido segregado em ida e volta (2026-08-01).** `/fares/current`
+  devolve, por dimensão, as parcelas da combinação **vencedora**
+  (`best_cash_outbound`/`best_cash_inbound`, e equivalentes em pts e híbrido).
+
+  As parcelas têm de vir do mesmo par que ganhou: o menor `out` e o menor `in`
+  tomados isoladamente descrevem um par que a companhia não vende — a volta
+  barata pode pertencer a outra ida.
+
+  Ficam **nulas** quando o total vem do bundle da companhia (preço único, sem
+  divisão publicada) e em rotina one-way. O card só mostra a divisão com as duas
+  parcelas presentes: metade da divisão é pior que nenhuma, porque o leitor
+  completa a outra de cabeça e erra.
 - **Prioridade cash/pts/hyb:** o par precisa ser comparado na mesma dimensão de
   preço da rotina (`priority`). Somar/comparar cash com cash, pts com pts.
 - **`cleanupPastDates` no RT:** quando a data de **ida** vira passado mas a de volta
