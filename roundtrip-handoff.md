@@ -247,7 +247,31 @@ mesma busca RT. Correto como fallback, mas não captura desconto explícito.
 
 ---
 
-## 8. Como retomar
+## 8. Estado do ambiente ao encerrar (2026-08-01)
+
+| Serviço | Estado |
+|---|---|
+| `flight-db` | container de pé, migrations 001–012 aplicadas **só no local** |
+| `flight-api` | container **reconstruído** com o código desta sessão, healthy |
+| `scraping.API` | roda no host; **precisa de restart** para pegar as correções do laço RT |
+| `flight.FRONT` | dev server derrubado |
+
+O front foi exposto na Tailscale (`100.77.40.44:3001`) para teste pelo celular e
+**já foi revertido**: dev server derrubado e `FRONTEND_URL` do container de volta
+para `localhost:3001`. A exposição não deixou pegada em nenhum repo — o override
+do compose viveu no scratchpad e as vars do Vite foram inline.
+
+⚠ A API responde na `3011` por qualquer interface, inclusive Tailscale: o
+`docker-compose.yml` versionado publica em `0.0.0.0:3011`. É anterior a esta
+sessão e não foi alterado. O CORS restrito a `localhost:3001` é o que impede um
+front de outra origem de usá-la. Para fechar de fato, seria
+`127.0.0.1:3011:3011` no compose.
+
+Produção intocada — o deploy é por GitHub Actions no push, e nada foi enviado.
+
+---
+
+## 9. Como retomar
 
 1. Ler este arquivo e `roundtrip-design.md`
 2. Ler `scraping.API/memory/azul/dom-structure.md`, seção **"Busca ida-e-volta (RT)"**
@@ -256,3 +280,19 @@ mesma busca RT. Correto como fallback, mas não captura desconto explícito.
 4. Rodar **2 ou 3 rotas RT diferentes** e comparar as listas de voltas entre as
    idas. É isso que decide o §5.2: se a lista nunca muda, o laço N-navegações
    compra dado repetido e o corte é natural.
+
+### Pendências abertas, em ordem de valor
+
+1. **§5.2, o gargalo** — o item acima. É a única decisão que trava a feature.
+2. **Rotina RT em pts/híbrido exibe a mensagem errada.** Agora que a criação é
+   barrada, sobra o caso legado: `best_pts` nulo faz o card dizer *"Sem preço
+   coletado ainda"* quando na verdade coletamos tudo, só que em dinheiro. A flag
+   `inbound_unavailable` não cobre isso — ela é para volta inacessível. Decidir
+   entre exibir "—" com o motivo ou tratar na leitura.
+3. **`detectLoyaltyLoginWall` nunca foi exercido** contra o modal real: com a ida
+   em reais ele não aparece. Segue heurística não confirmada.
+4. **Bundle (§5.3)** — `flight_fares.bundle_*` continua sempre nulo, e
+   `insertMany` nem grava essas colunas. A exibição segregada já trata o caso
+   (parcelas nulas), mas ninguém preenche ainda.
+5. **Senha do usuário de teste mudou** — `changeme123` dá 401. Sem ela não dá
+   para validar endpoints autenticados por curl.
