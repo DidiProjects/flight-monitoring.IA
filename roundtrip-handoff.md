@@ -247,6 +247,35 @@ mesma busca RT. Correto como fallback, mas não captura desconto explícito.
 
 ---
 
+## 7.1 Acesso pelo celular (2026-08-02)
+
+`npm run start:exposed` no flight.FRONT sobe o dev server no endereço da tailnet
+(`VITE_APP_URL`). **Validado de ponta a ponta pelo iPhone em 4G**, com login e
+navegação reais.
+
+A peça que resolveu não foi o Tailscale — foi o **proxy no Vite**. Com
+`VITE_API_URL=/flight`, o browser fala só com o dev server, que repassa para a
+API server-side. Sem origem cruzada, o CORS some da equação e o `.env` da
+flight.API nunca mais precisa ser tocado para expor o front.
+
+Armadilhas que custaram a sessão inteira:
+
+1. **Tela preta por cache de deps do Vite.** Instalar uma dependência faz o Vite
+   reotimizar e trocar o hash (`?v=...`); o browser com o hash antigo falha no
+   import e não mostra **nada**. Recarregar em aba anônima ou apagar
+   `node_modules/.vite`.
+2. **`vite --host` sem argumento escuta em TODAS as interfaces** — publicou o dev
+   server no adaptador da VPN comercial e num loopback com IP público. O script
+   faz bind só no endereço declarado.
+3. **No iOS não existe devtools.** Todo browser é WebKit, e o Web Inspector do
+   Safari exige Mac e só enxerga o Safari — não alcança Opera nem Chrome. Sem o
+   overlay de erro inline e o log de requisições com IP de origem, "não abre no
+   celular" é indistinguível de "não chega ao PC".
+4. **O usuário local é `diegossufmg@gmail.com`**, não o e-mail da conta Claude.
+   Foi o que gerou os 401 em todos os testes de curl com autenticação.
+
+---
+
 ## 8. Estado do ambiente ao encerrar (2026-08-01)
 
 | Serviço | Estado |
