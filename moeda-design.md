@@ -79,6 +79,7 @@ Estado atual dos dados (dev, 2026-08-04): 279 linhas em `flight_fares`, 3 moedas
 | 2 | **`airlines.currency` é apagada.** `airports.currency` fica parada (sem consumo). |
 | 3 | **Gráfico de histórico por moeda**, com **uma curva por perna** quando a rotina é ida-e-volta. Nada de série convertida. |
 | 4 | **A conversão vive só no pipeline de decisão.** A camada de exibição nunca converte — ver §5.5. |
+| 5 | **O par de moedas diferentes fica como está, sem total somado.** O card mostra as duas pernas, cada uma na sua moeda, e não inventa uma linha de total. O total em Real aparece só no e-mail de alvo, porque lá ele é o número que disparou o alerta. |
 
 ---
 
@@ -243,20 +244,22 @@ Passa a ler `legs[]`:
 └─────────────────────────────────────────┘
 ```
 
-Com moedas diferentes, a conversão fica visível em vez de escondida:
+Com moedas diferentes, **não há linha de total** (decisão 5) — somar £ com €
+exigiria uma conversão que o card não faz:
 
 ```
 │   Ida    STN→DUB   21/09    £ 17,99     │
 │   Volta  DUB→STN   25/09    € 17,99     │
 │   ─────────────────────────────────     │
-│   Total                    R$ 235,10 ⓘ  │
-│                            ⓘ convertido │
-│                              em 04/08   │
+│   Alvo                     R$ 200,00    │
 ```
 
-**Mobile:** as pernas já empilham; o cuidado é o total não quebrar linha e o
-ⓘ ser alvo de toque (≥44px), não hover. Vale revisar o card inteiro nessa
-passada, como você sugeriu.
+O usuário vê o que cada perna custa, na moeda em que ela é vendida, e o alvo em
+Real. Quando o alvo for atingido, é o **e-mail** que mostra a conta fechada em
+R$, com a cotação usada.
+
+**Mobile:** as pernas já empilham; sem a linha de total, o card fica mais curto
+que hoje. Vale revisar o card inteiro nessa passada, como você sugeriu.
 
 **`PriceHistoryPanel` / `FareCalendar`:** série **por moeda**, sem conversão
 nenhuma. Em rotina ida-e-volta, **duas curvas** — uma da ida, outra da volta —
@@ -294,29 +297,43 @@ se mostra o total em R$ com a taxa à vista.
 
 ### 5.6 O watermark não tem moeda — e isso é um problema novo
 
-`target_alert_state` guarda `notified_amount NUMERIC(12,2)` e **nenhuma coluna
-de moeda**. Ele é o "melhor preço já alertado" para a célula (rotina, data,
-tipo) e sobrevive entre ciclos.
+**O que é o watermark.** O ciclo confere preço a cada 5 minutos. Sem memória,
+toda rodada abaixo do alvo mandaria um e-mail — dezenas por dia da mesma
+passagem. Então guardamos, por célula **(rotina, data do voo, tipo de tarifa)**,
+o **melhor preço já avisado**. Só há novo e-mail quando o preço fica **abaixo
+dessa marca**, e aí a marca desce. É a marca que o rio deixa na parede, só que
+marcando até onde o preço desceu.
+
+`target_alert_state` guarda isso em `notified_amount NUMERIC(12,2)` e **nenhuma
+coluna de moeda**. Ele sobrevive entre ciclos.
 
 Com alvo em Real, o valor gravado passa a ser BRL convertido. Isso cria um
-efeito que hoje não existe: **o câmbio andar vira queda de preço**. A libra cai
-3%, a mesma passagem de £730 vira R$ 150 mais barata, e o watermark registra
-recorde — o e-mail diz "novo melhor preço" sem que a companhia tenha mexido em
-nada.
+efeito que hoje não existe: **o câmbio andar vira queda de preço**.
+
+| dia | preço na BA | cotação | vira | o que acontece |
+|---|---|---|---|---|
+| 04/08 | £ 730 | 6,83 | R$ 4.986 | marca = R$ 4.986, e-mail enviado |
+| 05/08 | £ 730 | 6,60 | R$ 4.818 | R$ 168 "mais barato" → **e-mail de recorde** |
+
+A companhia não mexeu em nada. E o efeito colateral é pior que o e-mail falso: a
+marca desce junto, escondendo uma queda real que venha depois.
 
 Três saídas, em ordem de esforço:
 
 1. **Gravar a moeda e o valor original no watermark** (`notified_currency`,
    `notified_amount_original`) e comparar **na moeda original quando ela não
-   mudou**, caindo para BRL só quando mudou. Mata o ruído na raiz e é honesto:
-   "o preço caiu" passa a significar preço, não câmbio.
-2. **Piso de variação**: só alerta se a melhora passar de X%. Simples, mas
-   esconde queda real pequena.
+   mudou** — £730 contra £730 não é queda, e nenhum e-mail sai. Cai para BRL só
+   quando a moeda de fato mudou entre as coletas.
+2. **Piso de variação**: só alerta se a melhora passar de X%. Uma linha, mas
+   engole queda real pequena.
 3. **Aceitar o ruído** e dizer no e-mail qual taxa foi usada. Barato, mas
    transfere o susto para o usuário.
 
 **Recomendo a 1.** São duas colunas em `target_alert_state` (não é tabela nova)
-e resolve de vez; as outras duas administram o sintoma.
+e é a única que faz "o preço caiu" voltar a significar preço, e não câmbio. As
+outras duas administram o sintoma.
+
+> 🟡 **Pendente de decisão** — é o único ponto aberto do plano.
 
 ### 5.7 O que o gráfico por moeda obriga a corrigir
 
@@ -397,9 +414,8 @@ persistido.
    `airports.currency` parada** (decisão 2).
 3. ~~Gráfico convertido ou por moeda~~ → **por moeda, curva por perna**
    (decisão 3).
-4. **O total do par com moedas diferentes, no card.** Única fronteira aberta:
-   mostrar só as duas pernas (£17,99 e €17,99, sem soma) ou mostrar também o
-   total em R$ com a taxa à vista. No **e-mail de alvo** o total em R$ aparece de
-   qualquer forma — é o número que disparou o alerta.
-5. **Ruído de câmbio no watermark**: confirmar a saída 1 da §5.6 (duas colunas em
-   `target_alert_state`) ou aceitar uma das alternativas mais baratas.
+4. ~~Total do par com moedas diferentes~~ → **fica sem total somado**, cada perna
+   na sua moeda (decisão 5).
+5. **Ruído de câmbio no watermark** (§5.6): confirmar a saída 1 — duas colunas em
+   `target_alert_state` — ou aceitar uma das alternativas mais baratas.
+   **← único ponto aberto.**
