@@ -71,6 +71,15 @@ Estado atual dos dados (dev, 2026-08-04): 279 linhas em `flight_fares`, 3 moedas
 > automaticamente. É o futuro que você descreveu; este plano só prepara o
 > terreno (alvo já normalizado em BRL).
 
+### Decisões fechadas em 2026-08-04
+
+| # | decisão |
+|---|---|
+| 1 | **Frankfurter pública**, sem auto-hospedar. Reavaliar por demanda. |
+| 2 | **`airlines.currency` é apagada.** `airports.currency` fica parada (sem consumo). |
+| 3 | **Gráfico de histórico por moeda**, com **uma curva por perna** quando a rotina é ida-e-volta. Nada de série convertida. |
+| 4 | **A conversão vive só no pipeline de decisão.** A camada de exibição nunca converte — ver §5.5. |
+
 ---
 
 ## 3. Conversão de moeda — qual API usar
@@ -175,34 +184,42 @@ Os 8 campos achatados saem. `routines.currency` deixa de ser fonte de exibição
 
 ### 5.2 `flight.DB` — migration 013
 
+Muito menor do que a primeira versão deste plano previa. Como a exibição não
+converte mais nada (§5.5), **`flight_fares` não ganha coluna de valor
+convertido** — ver §6.
+
 ```sql
-ALTER TABLE flight_fares
-  ADD COLUMN IF NOT EXISTS fare_cash_brl NUMERIC(12,2),
-  ADD COLUMN IF NOT EXISTS fx_rate       NUMERIC(18,8),
-  ADD COLUMN IF NOT EXISTS fx_source     VARCHAR(20),
-  ADD COLUMN IF NOT EXISTS fx_date       DATE;
+-- 1. A moeda passa a ser obrigatória (0 nulas hoje: janela barata)
+ALTER TABLE flight_fares ALTER COLUMN currency SET NOT NULL;
 
--- BRL não converte: taxa 1, fonte 'native'
-UPDATE flight_fares SET fare_cash_brl = fare_cash, fx_rate = 1, fx_source = 'native', fx_date = scraped_at::date
- WHERE currency = 'BRL' AND fare_cash IS NOT NULL AND fare_cash_brl IS NULL;
+-- 2. Fim do Real carimbado no que não é Real
+ALTER TABLE best_fares ALTER COLUMN currency DROP DEFAULT;
 
-ALTER TABLE flight_fares ALTER COLUMN currency SET NOT NULL;   -- 0 nulas hoje
-ALTER TABLE best_fares   ALTER COLUMN currency DROP DEFAULT;   -- fim do 'BRL' carimbado
+-- 3. A moeda de cadastro da companhia sai de cena
+ALTER TABLE airlines DROP COLUMN IF EXISTS currency;
+
+-- 4. O watermark passa a saber em que moeda o preço foi alertado, para que
+--    câmbio não vire "queda de preço" (§5.6)
+ALTER TABLE target_alert_state
+  ADD COLUMN IF NOT EXISTS notified_currency        VARCHAR(3),
+  ADD COLUMN IF NOT EXISTS notified_amount_original NUMERIC(12,2);
 ```
 
-As 42 linhas GBP/EUR ficam com `fare_cash_brl` nulo até o backfill (§7).
+`airports.currency` **fica como está**, sem consumo (decisão 2).
 
 ### 5.3 `flight.API`
 
 | arquivo | mudança |
 |---|---|
 | `modules/scrape/schema.ts` | `currency` deixa de ser `.optional()` quando `fareCash` vem — defesa em profundidade contra regressão do scraper |
-| `services/fx/FxRateService.ts` *(novo)* | `toBrl(amount, currency, date)`. Cache em memória por (moeda, dia). Provider primário + fallback. **Sem tabela nova** — a taxa usada é persistida na linha da tarifa |
-| `modules/scrape/ScrapeService.ts` | ao gravar a tarifa, resolve `fare_cash_brl`/`fx_rate`/`fx_source`/`fx_date`. Câmbio indisponível ⇒ grava a tarifa com BRL nulo (**não descarta**: a tarifa é boa, só a projeção falhou) |
-| `services/evaluation/EvaluationService.ts` | compara **só em BRL**. A guarda `outbound.currency !== inbound.currency` (linha 228) **sai** — ela existe porque não havia conversão; com BRL a soma passa a valer. Entra guarda nova: perna sem `fare_cash_brl` não entra no par |
-| `services/notifications/NotificationsService.ts` | fim do `?? routine.currency ?? 'BRL'`. E-mail mostra cada perna na moeda dela + total em R$ com a data da cotação |
-| `modules/routines/RoutinesService.ts` | `resolveCurrency` deixa de deduzir de cadastro; alvo é BRL por definição |
-| `modules/flight-fares/FlightFaresRepository.ts` | as queries de par passam a somar `fare_cash_brl`; expõem `currency` por perna |
+| `services/fx/FxRateService.ts` *(novo)* | `toBrl(amount, currency)`. Cache em memória por (moeda, dia), Frankfurter primária + fallback. **Não toca no banco** |
+| `modules/scrape/ScrapeService.ts` | **nada de conversão no ingest.** Só grava o que veio, com a moeda original |
+| `services/evaluation/EvaluationService.ts` | converte **em memória**, no ciclo, nas 5 comparações da §5.5. A guarda `outbound.currency !== inbound.currency` (linha 228) **sai** — ela existe porque não havia conversão. Entra: par cuja conversão falhou fica de fora do ciclo, com log |
+| `services/notifications/NotificationsService.ts` | fim do `?? routine.currency ?? 'BRL'`. E-mail mostra cada perna na moeda dela; o total em R$ aparece porque é o número que disparou o alerta, com a taxa e a data ao lado |
+| `modules/target-alert-state/*` | grava e compara `notified_currency` + `notified_amount_original` (§5.6) |
+| `modules/routines/RoutinesService.ts` | `resolveCurrency` **sai inteira** (é a origem do erro de cadastro); alvo é BRL por definição |
+| `modules/airlines/AirlinesRepository.ts` | remove `currency` da lista de colunas; `AirlineRow` perde o campo |
+| `modules/flight-fares/FlightFaresRepository.ts` | `getPriceHistory` ganha `GROUP BY currency` (§5.7); as queries de par expõem `currency` por perna |
 
 ### 5.4 `flight.FRONT`
 
@@ -241,24 +258,100 @@ Com moedas diferentes, a conversão fica visível em vez de escondida:
 ⓘ ser alvo de toque (≥44px), não hover. Vale revisar o card inteiro nessa
 passada, como você sugeriu.
 
-**`PriceHistoryPanel` / `FareCalendar`:** série em **R$ convertido** — é a única
-forma de o gráfico de uma rota internacional não ter degrau quando a moeda da
-coleta muda. Moeda original no tooltip.
+**`PriceHistoryPanel` / `FareCalendar`:** série **por moeda**, sem conversão
+nenhuma. Em rotina ida-e-volta, **duas curvas** — uma da ida, outra da volta —
+cada uma no eixo da sua moeda. Quando as duas pernas estão na mesma moeda,
+compartilham o eixo; quando não, cada curva ganha seu eixo (ou dois painéis
+empilhados, que no mobile é o que vai caber de qualquer jeito).
+
+Depende da correção do `GROUP BY currency` descrita em §5.7 — hoje o painel já
+mistura moedas em silêncio.
+
+**`AirlinesService` / `types/airlines.ts`:** o campo `currency` sai do tipo,
+junto com a coluna.
+
+### 5.5 Onde a conversão é — e não é — necessária
+
+A intuição de confinar a conversão à decisão do alerta está certa, e vira a
+linha arquitetural do projeto: **quem exibe nunca converte; quem decide sempre
+converte.** Só que "decidir" é mais do que comparar com o alvo. São **cinco**
+comparações numéricas no `EvaluationService`, e todas quebram com moeda mista:
+
+| # | onde | o que compara | por que precisa de moeda única |
+|---|---|---|---|
+| 1 | `bestInTargetByDate` | melhor preço da data **entre as companhias da rotina** | uma rotina aceita várias companhias, e elas podem precificar em moedas diferentes |
+| 2 | `bestPairsByOutboundDate` → `p.total` | **soma** das duas pernas | £17,99 + €17,99 não é número |
+| 3 | `amount < prev` | valor de hoje × **watermark** de `target_alert_state` | o watermark persiste entre ciclos |
+| 4 | `routineFloor = Math.min(...watermarks)` | piso da rotina entre **todas as datas** | mistura datas colhidas em mercados diferentes |
+| 5 | `offers.sort()` + `headline` | ordenação e manchete do e-mail | "a mais barata" exige unidade comum |
+
+Fora dessas cinco, **nada converte**: card, gráfico, tabela e o corpo do e-mail
+mostram cada perna na moeda em que ela foi vendida.
+
+Sobra **uma fronteira** a decidir (§9.3): o **total do par com moedas
+diferentes**, no card e no e-mail. Ou se mostra só as duas pernas sem total, ou
+se mostra o total em R$ com a taxa à vista.
+
+### 5.6 O watermark não tem moeda — e isso é um problema novo
+
+`target_alert_state` guarda `notified_amount NUMERIC(12,2)` e **nenhuma coluna
+de moeda**. Ele é o "melhor preço já alertado" para a célula (rotina, data,
+tipo) e sobrevive entre ciclos.
+
+Com alvo em Real, o valor gravado passa a ser BRL convertido. Isso cria um
+efeito que hoje não existe: **o câmbio andar vira queda de preço**. A libra cai
+3%, a mesma passagem de £730 vira R$ 150 mais barata, e o watermark registra
+recorde — o e-mail diz "novo melhor preço" sem que a companhia tenha mexido em
+nada.
+
+Três saídas, em ordem de esforço:
+
+1. **Gravar a moeda e o valor original no watermark** (`notified_currency`,
+   `notified_amount_original`) e comparar **na moeda original quando ela não
+   mudou**, caindo para BRL só quando mudou. Mata o ruído na raiz e é honesto:
+   "o preço caiu" passa a significar preço, não câmbio.
+2. **Piso de variação**: só alerta se a melhora passar de X%. Simples, mas
+   esconde queda real pequena.
+3. **Aceitar o ruído** e dizer no e-mail qual taxa foi usada. Barato, mas
+   transfere o susto para o usuário.
+
+**Recomendo a 1.** São duas colunas em `target_alert_state` (não é tabela nova)
+e resolve de vez; as outras duas administram o sintoma.
+
+### 5.7 O que o gráfico por moeda obriga a corrigir
+
+`FlightFaresRepository.getPriceHistory` agrega 30 dias por
+`(airline, origin, destination, flight_date)` e resolve a moeda com
+**`MAX(currency)`**. Quando a mesma rota foi colhida em duas moedas — que é
+exatamente o caso BA LHR→GRU (R$ 7.627 na busca RT, £ 730 na só-ida) — o
+`AVG`/`MIN`/`PERCENTILE` **misturam os dois números** e o resultado sai rotulado
+com a moeda que o `MAX` alfabético escolher. Hoje isso já está errado na tela.
+
+A correção que a sua decisão pede: **`GROUP BY currency`**, devolvendo uma série
+por moeda. A separação por perna sai de graça — a volta tem a rota invertida,
+então ida e volta já são consultas distintas de `origin`/`destination`; o que
+falta é o front pedir as duas e plotar as duas curvas.
 
 ---
 
 ## 6. Como a restrição "sem tabela nova" foi respeitada
 
-A taxa **não vira tabela**: vive em cache de memória no `FxRateService`
-(chave = moeda + dia, invalidada na virada do dia) e é **persistida na própria
-linha da tarifa** (`fx_rate`, `fx_source`, `fx_date`). Isso dá de graça três
-coisas que uma tabela de cotações daria: auditoria ("com que taxa este número
-foi calculado?"), imutabilidade do histórico (a taxa de ontem não muda) e
-reprocessamento por data (a Frankfurter serve histórico por dia).
+A taxa **não vira tabela e nem coluna de tarifa**: vive em cache de memória no
+`FxRateService` (chave = moeda + dia, invalidada na virada do dia).
 
-Custo aceito: reprocessar em lote exige varrer `flight_fares` em vez de uma
-tabela de taxas pequena. Com o volume atual (279 linhas) não é problema, e o
-gargalo real seria a API externa, não o banco.
+A primeira versão deste plano guardava `fare_cash_brl`/`fx_rate` em cada linha
+de `flight_fares`. Isso **caiu** quando você decidiu que o gráfico é por moeda:
+sem exibição convertida, o valor em Real só é consumido nas 5 comparações do
+ciclo de avaliação (§5.5), que roda de 5 em 5 minutos sobre algumas dezenas de
+tarifas. Converter na memória, ali, é mais barato que carregar quatro colunas em
+toda linha do histórico — e não cria um número derivado que pode envelhecer
+calado no banco.
+
+A auditoria que aquelas colunas dariam continua existindo, mas no lugar certo:
+a taxa usada é registrada **no alerta** (log estruturado + corpo do e-mail), que
+é onde alguém vai perguntar "por que isso disparou?". E o watermark guarda a
+moeda e o valor **original** (§5.6), que é o que torna a comparação entre ciclos
+honesta.
 
 ---
 
@@ -266,17 +359,21 @@ gargalo real seria a API externa, não o banco.
 
 | # | entrega | projetos | por que nesta ordem |
 |---|---|---|---|
-| 1 | moeda obrigatória + descarte | scraping.API | fecha a torneira antes de limpar o chão |
-| 2 | migration 013 (colunas + NOT NULL) | flight.DB | 0 nulas hoje: janela barata |
-| 3 | `FxRateService` + conversão no ingest | flight.API | passa a nascer com BRL |
-| 4 | backfill das 42 linhas GBP/EUR | flight.API (script) | usa a taxa da data da coleta |
-| 5 | avaliação e notificação em BRL | flight.API | depende de 3 e 4 |
-| 6 | entidade `legs` na resposta | flight.API | contrato novo para o front |
-| 7 | alvo fixo em R$ | flight.FRONT | depende de 5 |
-| 8 | card por trajeto + gráfico em R$ | flight.FRONT | depende de 6 |
+| 1 | moeda obrigatória + descarte de tarifa sem moeda | scraping.API | fecha a torneira antes de limpar o chão |
+| 2 | migration 013 (NOT NULL, drop default, drop `airlines.currency`, colunas do watermark) | flight.DB | 0 nulas hoje: janela barata |
+| 3 | `FxRateService` (Frankfurter + fallback, cache em memória) | flight.API | isolado, testável sozinho |
+| 4 | avaliação converte nas 5 comparações; watermark com moeda | flight.API | depende de 3; é o coração da mudança |
+| 5 | notificação sem `?? 'BRL'`, com taxa e data no e-mail | flight.API | depende de 4 |
+| 6 | `getPriceHistory` com `GROUP BY currency` | flight.API | corrige mistura que já existe hoje |
+| 7 | entidade `legs` na resposta; sai `resolveCurrency` e `airlines.currency` | flight.API | contrato novo para o front |
+| 8 | alvo fixo em R$ | flight.FRONT | depende de 5 |
+| 9 | card por trajeto + gráfico com curva por perna/moeda | flight.FRONT | depende de 6 e 7 |
 
 Ponto de corte seguro para uma primeira entrega: **1 a 5**. O sistema já passa a
-avaliar certo, com o front ainda no formato antigo.
+avaliar e notificar certo, com o front ainda no formato antigo.
+
+Sem backfill: nenhuma linha precisa ser reprocessada, porque nada convertido é
+persistido.
 
 ---
 
@@ -284,20 +381,25 @@ avaliar certo, com o front ainda no formato antigo.
 
 | risco | mitigação |
 |---|---|
-| API de câmbio fora do ar no ingest | tarifa entra com BRL nulo, job de retentativa preenche; fallback secundário; auto-hospedar a Frankfurter |
-| Taxa do BCE é de dia útil | para alvo de passagem a diferença é ruído; a data da taxa é exibida |
-| Descarte de tarifa sem moeda esconder quebra de scraper | contador e log por corrida; um scraper que passe a descartar tudo tem que aparecer |
-| Histórico com degrau na virada do regime | o backfill (passo 4) usa a taxa da data da coleta, não a de hoje |
-| Alvo em R$ confundir quem mira passagem em £ | texto de ajuda no formulário e conversão visível no card |
+| API de câmbio fora do ar no ciclo | o ciclo pula o par e loga; nada é gravado errado. Última taxa conhecida em cache cobre janelas curtas; fallback secundário cobre o resto |
+| Taxa do BCE é de dia útil | para alvo de passagem a diferença é ruído; a data da taxa vai no e-mail |
+| Câmbio virar "queda de preço" no watermark | §5.6, saída 1: comparar na moeda original quando ela não mudou |
+| Descarte de tarifa sem moeda esconder quebra de scraper | contador e log por corrida; um scraper que passe a descartar tudo tem que aparecer no log |
+| Alvo em R$ confundir quem mira passagem em £ | texto de ajuda no formulário; o e-mail mostra as duas pernas na moeda original **e** o total convertido com a taxa |
+| Depender de serviço público de terceiro | a Frankfurter é auto-hospedável com Docker — a porta de saída existe e está documentada, só não vamos usá-la agora |
 
 ---
 
-## 9. O que decidir antes de começar
+## 9. O que ainda falta decidir
 
-1. **Frankfurter pública ou auto-hospedada desde já?** Recomendo começar na
-   pública e subir a nossa quando o volume justificar.
-2. **`airports.currency` e `airlines.currency`: apagar ou deixar parados?**
-   Recomendo deixar (não custa nada) mas remover todo consumo, para não voltarem
-   a alimentar exibição por descuido.
-3. **Gráfico de histórico: BRL convertido ou série por moeda?** Recomendo BRL
-   pela comparabilidade — mas é decisão de produto.
+1. ~~Frankfurter pública ou auto-hospedada~~ → **pública** (decisão 1).
+2. ~~`airports.currency` / `airlines.currency`~~ → **`airlines.currency` apagada,
+   `airports.currency` parada** (decisão 2).
+3. ~~Gráfico convertido ou por moeda~~ → **por moeda, curva por perna**
+   (decisão 3).
+4. **O total do par com moedas diferentes, no card.** Única fronteira aberta:
+   mostrar só as duas pernas (£17,99 e €17,99, sem soma) ou mostrar também o
+   total em R$ com a taxa à vista. No **e-mail de alvo** o total em R$ aparece de
+   qualquer forma — é o número que disparou o alerta.
+5. **Ruído de câmbio no watermark**: confirmar a saída 1 da §5.6 (duas colunas em
+   `target_alert_state`) ou aceitar uma das alternativas mais baratas.
