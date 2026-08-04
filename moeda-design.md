@@ -7,8 +7,9 @@
 > Data: 2026-08-04 · Escopo: `scraping.API`, `flight.DB`, `flight.API`, `flight.FRONT`
 > Status: 🟡 proposta
 >
-> **Restrição do pedido:** sem tabela nova. Ver §6 — a conversão mora em colunas
-> da própria `flight_fares`, e a cotação do dia vive em cache de memória.
+> **Restrição do pedido:** sem tabela nova. Ver §7 — nenhum valor convertido é
+> persistido; a cotação vive em cache de memória e a conversão acontece só no
+> ciclo de avaliação.
 
 ---
 
@@ -62,10 +63,11 @@ Estado atual dos dados (dev, 2026-08-04): 279 linhas em `flight_fares`, 3 moedas
 3. **A moeda é guardada e exibida por trajeto.** Ida na moeda dela, volta na
    moeda dela — nunca uma moeda só para o par.
 4. **O alvo é sempre em Real.** Máscara fixa em R$ no formulário. Nós
-   convertemos cada perna e somamos para comparar.
-5. **A conversão é registrada.** Guardamos o valor convertido, a taxa e a data
-   da taxa junto da tarifa. Preço histórico não se reescreve quando o câmbio
-   muda.
+   convertemos cada jornada e somamos para comparar.
+5. **Nada convertido é persistido.** A conversão acontece no ciclo de avaliação
+   e é registrada onde alguém vai perguntar por ela — o log do alerta e o corpo
+   do e-mail. O histórico guarda só o que a companhia cobrou, na moeda em que
+   cobrou.
 
 > **Fica fora, por decisão:** escolher companhia/moeda pelo usuário
 > automaticamente. É o futuro que você descreveu; este plano só prepara o
@@ -80,6 +82,10 @@ Estado atual dos dados (dev, 2026-08-04): 279 linhas em `flight_fares`, 3 moedas
 | 3 | **Gráfico de histórico por moeda**, com **uma curva por perna** quando a rotina é ida-e-volta. Nada de série convertida. |
 | 4 | **A conversão vive só no pipeline de decisão.** A camada de exibição nunca converte — ver §5.5. |
 | 5 | **O par de moedas diferentes fica como está, sem total somado.** O card mostra as duas pernas, cada uma na sua moeda, e não inventa uma linha de total. O total em Real aparece só no e-mail de alvo, porque lá ele é o número que disparou o alerta. |
+| 6 | **O calendário de preços também segrega ida e volta**, como o histórico. Some a célula de "total do par". |
+| 7 | **A entidade é o trajeto, não a perna.** Ida e volta são *jornadas*; cada jornada tem uma lista de *trajetos*. Hoje sempre 1; o dia em que a ida tiver conexão modelada, a estrutura já cabe. Ver §4. |
+| 8 | **As APIs externas ficam numa camada de serviço própria**, consumível só por outro service ou controller, com o acesso à rede num ponto único. Segurança é requisito, não detalhe — ver §6. |
+| 9 | **O watermark decide pelos valores fragmentados**, com margem de segurança como rede. Ver §5.6. |
 
 ---
 
@@ -136,37 +142,60 @@ três atrás da mesma interface, escolhido por env.
 
 ---
 
-## 4. Modelo: a entidade trajeto
+## 4. Modelo: jornada e trajeto
 
 Hoje o par vive em **8 campos achatados** no `CurrentPrice`
 (`bestCashOutbound`, `bestCashInbound`, `bestPtsOutbound`, … ), e a moeda é uma
 só para todos. Não cabe mais moeda por perna sem virar 12 campos.
 
-Proposta — o trajeto vira objeto, dentro da entidade que já existe:
+A estrutura não para na perna. Quem é **vendido e precificado** é a ida (ou a
+volta) inteira; quem tem **rota** é cada trecho voado. Hoje uma conexão vira uma
+oferta só com `stops = 1`, e o caminho intermediário se perde. Modelar os dois
+níveis agora custa quase nada e é o que faz a ida com duas pernas caber sem
+refazer o contrato.
 
 ```ts
-interface Leg {
+/**
+ * O que a companhia VENDE e precifica: a ida, ou a volta.
+ * O dinheiro mora aqui — não no trajeto — porque é assim que a tarifa é cotada.
+ */
+interface Journey {
   direction: 'outbound' | 'inbound'
-  origin: string            // GRU
-  destination: string       // LHR
-  date: string              // 2026-09-21
-  currency: string          // BRL — sempre presente, sempre do site
+  date: string              // 2026-09-21 — a data da partida da jornada
+  currency: string          // sempre presente, sempre lida do site
   cash: number | null
   pts: number | null
   hybPts: number | null
   hybCash: number | null
-  cashBrl: number | null    // projeção para comparação/soma
-  fxRate: number | null     // 1 quando currency = BRL
-  fxDate: string | null
+  /** Os trechos voados, em ordem. Hoje sempre 1; conexão modelada dá N. */
+  segments: Segment[]
+}
+
+/** Um TRAJETO: um trecho voado, de um aeroporto a outro, num voo. */
+interface Segment {
+  origin: string            // GRU
+  destination: string       // LHR
+  flightNumber: string      // BA246
+  departureAt: string
+  arrivalAt: string
 }
 
 interface CurrentPrice {
-  legs: Leg[]               // 1 em só-ida, 2 em ida-e-volta
-  totalCashBrl: number | null   // soma das pernas, já em Real
-  mixedCurrency: boolean        // as pernas vieram em moedas diferentes
+  journeys: Journey[]       // 1 em só-ida, 2 em ida-e-volta
+  mixedCurrency: boolean    // as jornadas vieram em moedas diferentes
   // … campos de histórico que já existem
 }
 ```
+
+**Nomes:** o código do projeto é todo em inglês (`origin`, `isReturn`,
+`flight_number`), então `Journey`/`Segment` mantêm a casa consistente —
+"trajeto" é a palavra do domínio para `Segment`, e fica registrada aqui e nos
+comentários. Se preferir `Trajeto` no identificador, é trocar e seguir.
+
+**O que NÃO muda agora:** `flight_fares` continua uma linha por oferta, com
+`stops`. Nada de tabela de trechos — a estrutura de trajetos existe primeiro no
+**contrato da API e na tela**; a persistência só se desdobra quando houver
+scraper que colete o caminho da conexão.
 
 Os 8 campos achatados saem. `routines.currency` deixa de ser fonte de exibição.
 
@@ -199,11 +228,10 @@ ALTER TABLE best_fares ALTER COLUMN currency DROP DEFAULT;
 -- 3. A moeda de cadastro da companhia sai de cena
 ALTER TABLE airlines DROP COLUMN IF EXISTS currency;
 
--- 4. O watermark passa a saber em que moeda o preço foi alertado, para que
+-- 4. O watermark passa a guardar a COMPOSIÇÃO original do preço, para que
 --    câmbio não vire "queda de preço" (§5.6)
 ALTER TABLE target_alert_state
-  ADD COLUMN IF NOT EXISTS notified_currency        VARCHAR(3),
-  ADD COLUMN IF NOT EXISTS notified_amount_original NUMERIC(12,2);
+  ADD COLUMN IF NOT EXISTS notified_breakdown JSONB;
 ```
 
 `airports.currency` **fica como está**, sem consumo (decisão 2).
@@ -261,11 +289,52 @@ R$, com a cotação usada.
 **Mobile:** as pernas já empilham; sem a linha de total, o card fica mais curto
 que hoje. Vale revisar o card inteiro nessa passada, como você sugeriu.
 
-**`PriceHistoryPanel` / `FareCalendar`:** série **por moeda**, sem conversão
-nenhuma. Em rotina ida-e-volta, **duas curvas** — uma da ida, outra da volta —
-cada uma no eixo da sua moeda. Quando as duas pernas estão na mesma moeda,
-compartilham o eixo; quando não, cada curva ganha seu eixo (ou dois painéis
-empilhados, que no mobile é o que vai caber de qualquer jeito).
+**`PriceHistoryPanel` e `FareCalendar`: os dois passam a segregar ida e volta.**
+
+Hoje o calendário faz o contrário: com janela de volta presente, **cada célula é
+o TOTAL do par** daquela data de ida (é o que o próprio `FareCalendarProps`
+documenta). Isso some — não há mais total somado, e o total escondia de qual
+data de volta ele veio.
+
+O desenho minimalista, que serve os dois componentes e as duas telas:
+
+```
+┌───────────────────────────────────────────────┐
+│  Ida · GRU → LHR                    em R$     │
+│  ┌────┬────┬────┬────┬────┬────┬────┐         │
+│  │ 19 │ 20 │ 21 │ 22 │ 23 │ 24 │ 25 │         │
+│  │3.7k│3.5k│4.9k│3.3k│3.4k│3.9k│4.1k│         │
+│  └────┴────┴────┴────┴────┴────┴────┘         │
+│                                               │
+│  Volta · LHR → GRU                  em £      │
+│  ┌────┬────┬────┬────┬────┬────┬────┐         │
+│  │ 23 │ 24 │ 25 │ 26 │ 27 │ 28 │ 29 │         │
+│  │ 780│ 745│ 730│ 812│ 799│ 731│ 755│         │
+│  └────┴────┴────┴────┴────┴────┴────┘         │
+└───────────────────────────────────────────────┘
+```
+
+Três escolhas que fazem isso ficar simples em vez de virar duas telas:
+
+1. **A moeda vai no cabeçalho da faixa, não em cada célula.** É o que permite a
+   célula ser pequena o suficiente para caber a janela inteira no mobile, e o
+   que torna a moeda mista óbvia sem nenhum aviso extra.
+2. **Cada faixa tem a sua própria régua de veredito** (a cor verde/amarelo/
+   vermelho sai do histórico *daquele trecho, naquela moeda*). Hoje existe uma
+   régua separada só para os totais de par (`bestPairTotals`), justamente porque
+   comparar total contra média de uma perna pintava tudo de vermelho — com a
+   segregação essa régua especial deixa de ser necessária.
+3. **Uma faixa em rotina só-ida.** O componente é o mesmo; o que muda é a
+   quantidade de jornadas que ele recebe. Nada de branch por tipo de rotina.
+
+**Mobile:** cada faixa rola horizontalmente sozinha, com a data selecionada
+ancorada. Duas faixas de ~64px cabem sem empurrar o resto do card para baixo da
+dobra — mais curto que o layout de hoje, que ainda tinha a linha de total.
+
+**`PriceHistoryPanel`:** mesma lógica, **uma curva por jornada**, cada uma no
+eixo da sua moeda. Mesma moeda nas duas ⇒ eixo compartilhado e as curvas ficam
+comparáveis; moedas diferentes ⇒ dois painéis empilhados, porque sobrepor
+escalas diferentes no mesmo eixo é mentira visual.
 
 Depende da correção do `GROUP BY currency` descrita em §5.7 — hoje o painel já
 mistura moedas em silêncio.
@@ -318,22 +387,38 @@ efeito que hoje não existe: **o câmbio andar vira queda de preço**.
 A companhia não mexeu em nada. E o efeito colateral é pior que o e-mail falso: a
 marca desce junto, escondendo uma queda real que venha depois.
 
-Três saídas, em ordem de esforço:
+### Solução: decidir pelos valores fragmentados, com margem como rede
 
-1. **Gravar a moeda e o valor original no watermark** (`notified_currency`,
-   `notified_amount_original`) e comparar **na moeda original quando ela não
-   mudou** — £730 contra £730 não é queda, e nenhum e-mail sai. Cai para BRL só
-   quando a moeda de fato mudou entre as coletas.
-2. **Piso de variação**: só alerta se a melhora passar de X%. Uma linha, mas
-   engole queda real pequena.
-3. **Aceitar o ruído** e dizer no e-mail qual taxa foi usada. Barato, mas
-   transfere o susto para o usuário.
+O que decide se houve queda passa a ser **o que a companhia cobra**, não o
+número convertido. O watermark guarda, além do valor em BRL, a **composição
+original** do preço — as jornadas com sua moeda e seu valor:
 
-**Recomendo a 1.** São duas colunas em `target_alert_state` (não é tabela nova)
-e é a única que faz "o preço caiu" voltar a significar preço, e não câmbio. As
-outras duas administram o sintoma.
+```jsonc
+// target_alert_state.notified_breakdown (JSONB)
+[
+  { "direction": "outbound", "currency": "GBP", "amount": 730.00 },
+  { "direction": "inbound",  "currency": "EUR", "amount":  17.99 }
+]
+```
 
-> 🟡 **Pendente de decisão** — é o único ponto aberto do plano.
+Regra de decisão, nesta ordem:
+
+1. **Composição idêntica à guardada ⇒ o preço não mudou.** Não alerta, não
+   importa o que o câmbio fez. Mata o caso da tabela acima na raiz.
+2. **Composição diferente ⇒ compara em BRL**, como no resto do sistema.
+3. **Margem de segurança** sobre o passo 2: só alerta se a melhora passar de
+   `FX_NOISE_MARGIN` (sugestão: **1%**, configurável por env). Absorve
+   arredondamento e microvariação de câmbio quando a composição mudou de
+   verdade mas o preço, na prática, não.
+
+O passo 1 resolve o caso comum (mesma passagem, câmbio andou) com precisão
+total. O passo 3 é a rede para o caso em que a composição muda por um centavo.
+
+Custo: **uma coluna** em `target_alert_state` (`notified_breakdown JSONB`), sem
+tabela nova. JSONB e não texto porque é dado estruturado que vamos querer ler em
+diagnóstico — "com que composição este alerta foi disparado?".
+
+> ✅ Decidido em 2026-08-04 (decisão 9).
 
 ### 5.7 O que o gráfico por moeda obriga a corrigir
 
@@ -351,7 +436,77 @@ falta é o front pedir as duas e plotar as duas curvas.
 
 ---
 
-## 6. Como a restrição "sem tabela nova" foi respeitada
+## 6. A camada de câmbio: arquitetura e segurança
+
+Regra de acesso: **só outro service ou um controller chama o `FxRateService`.**
+Nenhuma rota HTTP expõe câmbio, e nenhum repositório ou componente de tela fala
+com a rede. Isso não é convenção verbal — é o desenho: o service entra por
+injeção no `container.ts`, e a única classe que abre socket é o
+`ExchangeRateHttpClient`.
+
+```
+src/services/fx/
+  interfaces/IFxRateService.ts        contrato consumido pelo resto do sistema
+  FxRateService.ts                    cache, política de fallback, sanidade
+  ExchangeRateHttpClient.ts           ÚNICO ponto que fala com a rede
+  providers/
+    IExchangeRateProvider.ts          contrato do provedor
+    FrankfurterProvider.ts            primária   (api.frankfurter.dev)
+    CurrencyApiProvider.ts            fallback   (@fawazahmed0 via jsDelivr)
+```
+
+O `FxRateService` expõe pouco de propósito:
+
+```ts
+interface IFxRateService {
+  /** Converte para BRL. `null` quando não há taxa confiável — quem chama decide. */
+  toBrl(amount: number, currency: string): Promise<ConvertedAmount | null>
+}
+
+interface ConvertedAmount {
+  amount: number       // em BRL
+  rate: number
+  source: 'frankfurter' | 'currency-api' | 'native'
+  rateDate: string     // a data da cotação, não a de hoje
+  stale: boolean       // veio de cache antigo porque todos os provedores falharam
+}
+```
+
+`null` em vez de exceção, e `stale` explícito: quem chama (a avaliação) precisa
+poder **pular o par** em vez de decidir com número duvidoso.
+
+### O que protege
+
+| # | medida | o que evita |
+|---|---|---|
+| 1 | **Allowlist de host** no client, e **redirect não é seguido** | SSRF e sequestro de resposta por redirect. As URLs são constantes do código — nunca vêm de input |
+| 2 | **HTTPS obrigatório**, sem downgrade | resposta adulterada em trânsito |
+| 3 | **Timeout curto (3s) com `AbortController`** | o ciclo de avaliação travar preso num terceiro |
+| 4 | **1 retry com backoff + jitter**, e só então o fallback | martelar um provedor instável |
+| 5 | **Circuit breaker**: N falhas seguidas tiram o provedor por X min | insistir no que está fora do ar |
+| 6 | **Validação da resposta com zod** | confiar no shape de JSON externo |
+| 7 | **Faixa de sanidade da taxa** (finita, > 0, dentro de limites plausíveis por par) | cotação absurda/envenenada virar decisão de alerta. Uma taxa errada aqui manda e-mail errado para o usuário |
+| 8 | **Cache por (moeda, dia)** com `stale-while-error` | uma indisponibilidade curta parar a avaliação |
+| 9 | **Nada de PII na requisição** — só o par de moedas | vazamento por telemetria de terceiro |
+| 10 | **Sem segredo hoje; se auto-hospedar, chave por env e nunca logada** | credencial em log |
+| 11 | **Log estruturado com provedor, taxa e data** | alerta que não se consegue explicar depois |
+
+Medida 7 merece o destaque: é a única que protege de um erro *silencioso*. As
+outras dez falham barulhento; uma taxa errada passa despercebida e vira e-mail
+de "preço caiu".
+
+### Testes desta camada
+
+- provedor devolvendo JSON fora do schema ⇒ `null`, sem exceção vazando
+- taxa fora da faixa de sanidade ⇒ rejeitada, cai para o fallback
+- primária fora do ar ⇒ fallback assume, `source` reflete
+- os dois fora ⇒ cache velho com `stale: true`; sem cache, `null`
+- host fora da allowlist ⇒ recusa antes de abrir conexão
+- `BRL → BRL` ⇒ taxa 1, `source: 'native'`, **sem chamada de rede**
+
+---
+
+## 7. Como a restrição "sem tabela nova" foi respeitada
 
 A taxa **não vira tabela e nem coluna de tarifa**: vive em cache de memória no
 `FxRateService` (chave = moeda + dia, invalidada na virada do dia).
@@ -372,19 +527,19 @@ honesta.
 
 ---
 
-## 7. Ordem de execução
+## 8. Ordem de execução
 
 | # | entrega | projetos | por que nesta ordem |
 |---|---|---|---|
 | 1 | moeda obrigatória + descarte de tarifa sem moeda | scraping.API | fecha a torneira antes de limpar o chão |
-| 2 | migration 013 (NOT NULL, drop default, drop `airlines.currency`, colunas do watermark) | flight.DB | 0 nulas hoje: janela barata |
-| 3 | `FxRateService` (Frankfurter + fallback, cache em memória) | flight.API | isolado, testável sozinho |
-| 4 | avaliação converte nas 5 comparações; watermark com moeda | flight.API | depende de 3; é o coração da mudança |
+| 2 | migration 013 (NOT NULL, drop default, drop `airlines.currency`, `notified_breakdown`) | flight.DB | 0 nulas hoje: janela barata |
+| 3 | camada `services/fx` completa (§6), com os testes de segurança | flight.API | isolada, testável sem o resto do sistema |
+| 4 | avaliação converte nas 5 comparações; watermark decide pela composição | flight.API | depende de 3; é o coração da mudança |
 | 5 | notificação sem `?? 'BRL'`, com taxa e data no e-mail | flight.API | depende de 4 |
-| 6 | `getPriceHistory` com `GROUP BY currency` | flight.API | corrige mistura que já existe hoje |
-| 7 | entidade `legs` na resposta; sai `resolveCurrency` e `airlines.currency` | flight.API | contrato novo para o front |
+| 6 | `getPriceHistory` com `GROUP BY currency`, por jornada | flight.API | corrige mistura que já existe hoje |
+| 7 | contrato `journeys[]`/`segments[]`; saem `resolveCurrency` e `airlines.currency` | flight.API | contrato novo para o front |
 | 8 | alvo fixo em R$ | flight.FRONT | depende de 5 |
-| 9 | card por trajeto + gráfico com curva por perna/moeda | flight.FRONT | depende de 6 e 7 |
+| 9 | card, calendário e histórico segregados por jornada e moeda | flight.FRONT | depende de 6 e 7 |
 
 Ponto de corte seguro para uma primeira entrega: **1 a 5**. O sistema já passa a
 avaliar e notificar certo, com o front ainda no formato antigo.
@@ -394,28 +549,40 @@ persistido.
 
 ---
 
-## 8. Riscos
+## 9. Riscos
 
 | risco | mitigação |
 |---|---|
 | API de câmbio fora do ar no ciclo | o ciclo pula o par e loga; nada é gravado errado. Última taxa conhecida em cache cobre janelas curtas; fallback secundário cobre o resto |
 | Taxa do BCE é de dia útil | para alvo de passagem a diferença é ruído; a data da taxa vai no e-mail |
-| Câmbio virar "queda de preço" no watermark | §5.6, saída 1: comparar na moeda original quando ela não mudou |
+| Câmbio virar "queda de preço" no watermark | §5.6: composição idêntica não alerta; margem de 1% cobre o resto |
+| Cotação errada de um provedor virar alerta falso | §6 medida 7 — faixa de sanidade por par. É a única falha *silenciosa* da camada externa |
 | Descarte de tarifa sem moeda esconder quebra de scraper | contador e log por corrida; um scraper que passe a descartar tudo tem que aparecer no log |
 | Alvo em R$ confundir quem mira passagem em £ | texto de ajuda no formulário; o e-mail mostra as duas pernas na moeda original **e** o total convertido com a taxa |
 | Depender de serviço público de terceiro | a Frankfurter é auto-hospedável com Docker — a porta de saída existe e está documentada, só não vamos usá-la agora |
 
 ---
 
-## 9. O que ainda falta decidir
+## 10. Decisões — todas fechadas
 
-1. ~~Frankfurter pública ou auto-hospedada~~ → **pública** (decisão 1).
-2. ~~`airports.currency` / `airlines.currency`~~ → **`airlines.currency` apagada,
-   `airports.currency` parada** (decisão 2).
-3. ~~Gráfico convertido ou por moeda~~ → **por moeda, curva por perna**
-   (decisão 3).
-4. ~~Total do par com moedas diferentes~~ → **fica sem total somado**, cada perna
-   na sua moeda (decisão 5).
-5. **Ruído de câmbio no watermark** (§5.6): confirmar a saída 1 — duas colunas em
-   `target_alert_state` — ou aceitar uma das alternativas mais baratas.
-   **← único ponto aberto.**
+| # | pergunta | resposta |
+|---|---|---|
+| 1 | Frankfurter pública ou auto-hospedada | **pública**, sem auto-hospedar por ora |
+| 2 | `airports.currency` / `airlines.currency` | **`airlines.currency` apagada**, `airports.currency` parada |
+| 3 | Gráfico convertido ou por moeda | **por moeda**, uma curva por jornada |
+| 4 | Total do par com moedas diferentes | **sem total somado** no card; total em R$ só no e-mail |
+| 5 | Calendário de preços | **segregado em ida e volta**, como o histórico |
+| 6 | Modelo do par | **jornada → trajetos**, pronto para conexão |
+| 7 | APIs externas | **camada `services/fx` própria**, rede num ponto só, §6 |
+| 8 | Ruído de câmbio no watermark | **composição original** decide; margem de 1% como rede |
+
+Nada em aberto. Próximo passo: executar o item 1 da §8 — moeda obrigatória na
+`scraping.API`.
+
+### Aberto de propósito, para depois
+
+- **Escolher companhia e moeda pelo usuário.** O futuro que você descreveu. O
+  alvo já normalizado em Real é a peça que faltava para isso ser possível.
+- **Persistir os trajetos de uma conexão.** A estrutura da §4 aceita; falta
+  scraper que colete o caminho intermediário.
+- **PTAX como fonte auditável.** Documentada na §3, sem uso hoje.
