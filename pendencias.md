@@ -167,11 +167,16 @@ curva por perna — decisão 3 — depende do front pedir por jornada.
 
 | projeto | branch | commits à frente |
 |---|---|---|
-| scraping.API | `feat/autonomous-scrapers` | 7 |
-| flight.API | `feat/roundtrip-analysis` | 10 |
-| flight.DB | `feat/roundtrip-analysis` | 5 |
+| scraping.API | `feat/autonomous-scrapers` | 8 |
+| flight.API | `feat/roundtrip-analysis` | 8 |
+| flight.DB | `feat/roundtrip-analysis` | 4 |
 | flight.FRONT | `feat/roundtrip-analysis` | 1 |
-| flight-monitoring.IA | `feat/roundtrip-analysis` | 6 |
+| flight-monitoring.IA | `feat/roundtrip-analysis` | 7 |
+
+`.claude/settings.local.json` tem alterações não commitadas (permissões
+acumuladas na sessão) — `.claude` está no `.gitignore`, então ficou como está.
+`gol-coverage.json` também segue sem rastreamento: já estava assim quando a
+sessão começou.
 
 **As 6 rotinas de teste (Ryanair e BA) estão inativas e sem `target_cash`.** Elas
 coletam quando despachadas à mão, mas **não disparam alerta** — o ciclo de
