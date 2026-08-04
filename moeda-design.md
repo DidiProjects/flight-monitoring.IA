@@ -110,6 +110,14 @@ GET https://api.frankfurter.dev/v1/latest?base=GBP&symbols=BRL
 - ⚠ Publica em **dias úteis**, uma vez ao dia (16h CET). Fim de semana e feriado
   repetem a última. Para alvo de passagem isso é irrelevante; para trading não
   serviria.
+- ⚠ **Rate-limit por conexão pendurada** (medido em 2026-08-04): as três
+  primeiras chamadas seguidas voltam em ~120ms; da quarta em diante a conexão
+  simplesmente não responde — sem 429, sem status, até estourar o timeout do
+  cliente. Não é problema no regime normal (cache por moeda/dia = ~2 chamadas
+  diárias), mas explica por que o fallback é requisito e não conforto: numa
+  partida a frio com várias moedas de uma vez, a primária cai. Foi exatamente o
+  que o teste de rede observou — GBP passou, EUR e USD deram timeout, e a
+  `currency-api` cobriu sem perda.
 
 ### Reserva: **@fawazahmed0/exchange-api** (jsDelivr)
 
@@ -554,6 +562,7 @@ persistido.
 | risco | mitigação |
 |---|---|
 | API de câmbio fora do ar no ciclo | o ciclo pula o par e loga; nada é gravado errado. Última taxa conhecida em cache cobre janelas curtas; fallback secundário cobre o resto |
+| Rate-limit da primária numa partida a frio | medido: a Frankfurter para de responder após ~3 chamadas seguidas. O disjuntor (3 falhas) tira ela de circulação por 5 min e a `currency-api` assume — validado no teste de rede |
 | Taxa do BCE é de dia útil | para alvo de passagem a diferença é ruído; a data da taxa vai no e-mail |
 | Câmbio virar "queda de preço" no watermark | §5.6: composição idêntica não alerta; margem de 1% cobre o resto |
 | Cotação errada de um provedor virar alerta falso | §6 medida 7 — faixa de sanidade por par. É a única falha *silenciosa* da camada externa |
