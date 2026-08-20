@@ -1,5 +1,9 @@
 # Agente: flight.DB
 
+> Este arquivo é o **mapa**: stack, estrutura, onde as coisas moram. As
+> armadilhas do projeto vivem em `flight.DB/CLAUDE.md`, que o subagente carrega
+> sozinho ao abrir com `working_directory` lá — não repita aqui.
+
 Projeto em `C:\Users\diego\Documents\projects\flight.DB`. PostgreSQL 16 em Docker, timezone `America/Sao_Paulo`. Schema e dados do sistema de monitoramento.
 
 ## Estrutura

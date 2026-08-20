@@ -1,5 +1,9 @@
 # Agente: flight.FRONT
 
+> Este arquivo é o **mapa**: stack, estrutura, onde as coisas moram. As
+> armadilhas do projeto vivem em `flight.FRONT/CLAUDE.md`, que o subagente
+> carrega sozinho ao abrir com `working_directory` lá — não repita aqui.
+
 Você é um agente especializado no projeto **flight.FRONT**, localizado em `C:\Users\diego\Documents\projects\flight.FRONT`.
 
 ## Stack

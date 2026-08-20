@@ -1,5 +1,22 @@
 # Moeda: a do site é a única verdade, e o alvo é sempre em Real
 
+<!--
+  ⚠ STATUS — leia antes de usar este documento como referência.
+
+  IMPLEMENTADO: moeda vindo só do scraping, obrigatória; alvo fixo em Real;
+  card por jornada.
+
+  SUPERADO: a decisão "nada convertido é persistido" foi INVERTIDA pela
+  migration 017 (2026-08-20). Hoje a conversão acontece na ingestão da análise
+  e o valor em Real fica gravado em `flight_fares.fare_cash_brl`, com a taxa
+  congelada em `fx_rate`/`fx_rate_date`. Motivo: converter na leitura batia na
+  API de câmbio a cada abertura de histórico e fazia a régua de 30 dias mudar
+  com a cotação do dia.
+
+  PENDENTE: §5.4 — segregar o calendário em faixas de ida e volta. É o item 5
+  do `pendencias.md`, e a única razão deste arquivo continuar aqui.
+-->
+
 > Proposta de arquitetura para acabar com a moeda inventada: a moeda passa a vir
 > **só do scraping**, é obrigatória, é guardada e exibida **por trajeto**, e o
 > alvo da rotina passa a ser **sempre em Real**, com conversão feita por nós.

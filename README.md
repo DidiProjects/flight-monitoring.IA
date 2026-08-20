@@ -1,39 +1,53 @@
 # flight-monitoring.IA
 
-Orquestrador de IA para o ecossistema de monitoramento de preços de voos. A partir deste repositório, coordeno trabalho nos 4 projetos do sistema usando subagentes especializados com contexto pré-carregado.
+Orquestrador de IA do ecossistema de monitoramento de preços de voos. A partir
+daqui o trabalho nos quatro projetos é coordenado com subagentes que já sobem
+com o contexto do projeto carregado.
 
-## Projetos do ecossistema
+## Projetos
 
-| Projeto | Caminho | Responsabilidade |
-|---------|---------|-----------------|
-| flight.API | `C:\Users\diego\Documents\projects\flight.API` | REST API (Fastify) — lógica de negócio, webhooks, alertas por email |
-| flight.FRONT | `C:\Users\diego\Documents\projects\flight.FRONT` | Frontend React/MUI — interface do usuário |
-| flight.DB | `C:\Users\diego\Documents\projects\flight.DB` | PostgreSQL — schema, migrações, infraestrutura Docker |
-| scraping.API | `C:\Users\diego\Documents\projects\scraping.API` | Scraper Playwright + Claude AI — coleta preços no site da Azul |
-
-## Fluxo do sistema
+| Projeto | Responsabilidade |
+|---------|-----------------|
+| flight.API | REST Fastify — negócio, webhooks, alertas por e-mail |
+| flight.FRONT | React/MUI — interface |
+| flight.DB | PostgreSQL — schema, migrations, Docker |
+| scraping.API | Playwright — coleta preços nos sites das companhias |
 
 ```
 flight.FRONT → flight.API ←→ flight.DB
                     ↕
-              scraping.API → [Site Azul]
+              scraping.API → [sites das companhias]
 ```
 
-O usuário cria rotinas no FRONT → API persiste no DB e agenda scraping → scraping.API executa e retorna ofertas via webhook → API avalia e envia alertas por email.
+Rotina criada no FRONT → API persiste e agenda → scraping.API coleta e devolve
+por webhook → API avalia e alerta.
 
-## Estrutura deste repositório
+## Estrutura
 
 ```
 flight-monitoring.IA/
-├── agents/
-│   ├── flight-api.md       # Contexto completo para subagente do flight.API
-│   ├── flight-front.md     # Contexto completo para subagente do flight.FRONT
-│   ├── flight-db.md        # Contexto completo para subagente do flight.DB
-│   └── scraping-api.md     # Contexto completo para subagente do scraping.API
-├── CLAUDE.md               # Instruções de orquestração para o Claude Code
+├── agents/        # contexto por projeto, consumido ao spawnar subagente
+├── design/        # propostas de arquitetura ainda NÃO implementadas
+├── CLAUDE.md      # instruções de orquestração
 └── README.md
 ```
 
+## Onde vivem as instruções de IA
+
+| Camada | Onde | O quê |
+|---|---|---|
+| Global | `~/.claude/CLAUDE.md` e `~/.claude/rules/` | autonomia, commits, PRs, testes, comentários — carrega em todo repositório |
+| Projeto | `<repo>/CLAUDE.md` | só as armadilhas daquele projeto |
+| Orquestração | este repositório | mapa do ecossistema e como spawnar subagente |
+
+**Cada regra tem um dono só.** Nada que vale para todos os projetos é repetido
+num projeto; nada específico de um projeto sobe para o global. Mudar a regra de
+commit é editar um arquivo, não cinco.
+
+O global é pessoal e não versionado: vive na máquina, fora do git.
+
 ## Como usar
 
-Abra este repositório no Claude Code e descreva o problema. O agente identifica automaticamente qual projeto é afetado, carrega o contexto do arquivo `agents/<projeto>.md` e spawna um subagente especializado para investigar ou implementar — sem precisar re-explorar o código do zero a cada sessão.
+Abra este repositório no Claude Code e descreva o problema. O agente identifica
+o projeto afetado, carrega `agents/<projeto>.md` e spawna um subagente
+especializado — sem re-explorar o código do zero a cada sessão.

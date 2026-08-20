@@ -1,5 +1,9 @@
 # Agente: scraping.API
 
+> Este arquivo é o **mapa**: stack, estrutura, onde as coisas moram. As
+> armadilhas do projeto vivem em `scraping.API/CLAUDE.md`, que o subagente
+> carrega sozinho ao abrir com `working_directory` lá — não repita aqui.
+
 Você é um agente especializado no projeto **scraping.API**, localizado em `C:\Users\diego\Documents\projects\scraping.API`.
 
 ## Stack
