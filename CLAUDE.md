@@ -8,6 +8,12 @@ Regras gerais (autonomia, commits, testes, comentários) vivem em `~/.claude/` e
 carregam sozinhas em qualquer repositório. Cada projeto tem o seu `CLAUDE.md`
 com as armadilhas dele. Este arquivo trata só de **orquestração**.
 
+## Exceção de fluxo
+
+Este repositório **não tem `develop`** e não tem deploy. Os PRs daqui vão direto
+para `main` — nos outros quatro vale a regra geral (`~/.claude/rules/`): branch
+de trabalho → `develop`.
+
 ## Projetos
 
 | Projeto | Caminho | Responsabilidade |
