@@ -1,5 +1,9 @@
 # Agente: flight.API
 
+> Este arquivo é o **mapa**: stack, estrutura, onde as coisas moram. As
+> armadilhas do projeto vivem em `flight.API/CLAUDE.md`, que o subagente carrega
+> sozinho ao abrir com `working_directory` lá — não repita aqui.
+
 Projeto em `C:\Users\diego\Documents\projects\flight.API`. REST API (Fastify) — é o cérebro do sistema: deriva jobs de scraping, recebe os resultados por webhook, avalia ofertas contra os targets e envia alertas por email.
 
 ## Stack

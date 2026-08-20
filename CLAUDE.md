@@ -1,73 +1,60 @@
 # flight-monitoring.IA — Orquestrador
 
-Este projeto é o ponto central de coordenação do ecossistema de monitoramento de voos. Ao iniciar qualquer sessão aqui, você age como orquestrador: identifica em qual projeto o problema reside, spawna subagentes especializados e sintetiza os resultados.
+Ponto central de coordenação do ecossistema. Aqui você identifica em qual
+projeto o problema mora, spawna subagentes especializados e sintetiza o
+resultado.
 
-## Projetos do ecossistema
+Regras gerais (autonomia, commits, testes, comentários) vivem em `~/.claude/` e
+carregam sozinhas em qualquer repositório. Cada projeto tem o seu `CLAUDE.md`
+com as armadilhas dele. Este arquivo trata só de **orquestração**.
+
+## Projetos
 
 | Projeto | Caminho | Responsabilidade |
 |---------|---------|-----------------|
-| flight.API | `C:\Users\diego\Documents\projects\flight.API` | REST API (Fastify) — lógica de negócio, webhooks, alertas por email |
-| flight.FRONT | `C:\Users\diego\Documents\projects\flight.FRONT` | Frontend React/MUI — interface do usuário |
-| flight.DB | `C:\Users\diego\Documents\projects\flight.DB` | PostgreSQL — schema, migrações, infraestrutura Docker |
-| scraping.API | `C:\Users\diego\Documents\projects\scraping.API` | Scraper Playwright + Claude AI — coleta preços no site da Azul |
-
-## Fluxo do sistema
+| flight.API | `../flight.API` | REST Fastify — negócio, webhooks, alertas por e-mail |
+| flight.FRONT | `../flight.FRONT` | React/MUI — interface |
+| flight.DB | `../flight.DB` | PostgreSQL — schema, migrations, Docker |
+| scraping.API | `../scraping.API` | Playwright — coleta preços nos sites das companhias |
 
 ```
 flight.FRONT → flight.API ←→ flight.DB
                     ↕
-              scraping.API → [Site Azul]
+              scraping.API → [sites das companhias]
 ```
 
-O usuário cria rotinas no FRONT → API persiste no DB e agenda scraping → scraping.API executa e retorna ofertas via webhook → API avalia e envia alertas por email.
+Rotina criada no FRONT → API persiste e agenda → scraping.API coleta e devolve
+por webhook → API avalia e alerta.
 
-## Como identificar o projeto afetado
+## Onde o problema mora
 
-- **Problema de UI / formulário / exibição** → flight.FRONT
-- **Alerta não enviado / lógica de comparação / rotina não executada** → flight.API
-- **Dados incorretos / schema / query lenta** → flight.DB
-- **Scraping falhando / Playwright travado / webhook não chegando** → scraping.API
-- **Problema de integração entre serviços** → verificar ambos os lados
+| Sintoma | Projeto |
+|---|---|
+| Formulário, exibição, valor errado na tela | flight.FRONT |
+| Alerta não enviado, comparação, rotina não executada | flight.API |
+| Dado incorreto, schema, query lenta | flight.DB |
+| Scraping falhando, Playwright travado, webhook não chega | scraping.API |
 
-## Como spawnar subagentes especializados
+Antes de escolher, vale checar se o sintoma não é de leitura: **valor errado na
+tela pode ser dado certo com rótulo errado**, e aí o projeto é outro.
 
-Ao receber uma tarefa que envolve um projeto específico, spawne um agente com `working_directory` no projeto correto e forneça contexto suficiente no prompt para evitar re-exploração desnecessária.
+## Spawnar subagente
 
-### Arquivos de agente (prompts prontos)
+1. Ler `agents/<projeto>.md` — é o contexto pronto daquele projeto
+2. Acrescentar o problema relatado e a tarefa
+3. Spawnar com `working_directory` no caminho do projeto
 
-Cada projeto tem um arquivo de contexto completo em `agents/`. Ao spawnar um subagente, **leia o arquivo correspondente** e use seu conteúdo como base do prompt:
+Paralelizar quando o problema toca dois projetos independentes. Ao final,
+sintetizar num resumo só — não despejar o relatório de cada agente.
 
-| Projeto | Arquivo |
-|---------|---------|
-| flight.API | `agents/flight-api.md` |
-| flight.FRONT | `agents/flight-front.md` |
-| flight.DB | `agents/flight-db.md` |
-| scraping.API | `agents/scraping-api.md` |
+## Documentos
 
-### Como montar o prompt do subagente
+- `README.md` — visão geral do ecossistema
+- `agents/*.md` — contexto por projeto, para subagente
+- `design/` — propostas de arquitetura ainda **não** implementadas
 
-1. Leia o arquivo `agents/<projeto>.md`
-2. Adicione ao final: contexto do problema + tarefa específica
-3. Spawne o agente apontando o `working_directory` para o caminho do projeto
-
-```
-[conteúdo de agents/<projeto>.md]
-
----
-
-## Problema relatado
-
-[descrição do que o usuário reportou]
-
-## Tarefa
-
-[o que o agente deve investigar / implementar / corrigir]
-```
-
-## Princípios de orquestração eficiente
-
-1. **Identifique antes de agir** — sempre mapeie qual projeto é afetado antes de spawnar agentes
-2. **Forneça contexto rico** — inclua stack, estrutura e problema no prompt do subagente para evitar exploração redundante
-3. **Paralelize quando possível** — se o problema afeta 2+ projetos independentes, spawne agentes em paralelo
-4. **Sintetize os resultados** — após retorno dos subagentes, apresente ao usuário um resumo coeso com as mudanças feitas
-5. **Atualize as memórias** — se descobrir algo novo sobre um projeto (nova dependência, decisão arquitetural), atualize os arquivos de memória em `C:\Users\diego\.claude\projects\C--Users-diego-Documents-projects-flight-monitoring-IA\memory\`
+Proposta implementada sai daqui: quem descreve o sistema é o código, o
+`design.md` do flight.DB e os `CLAUDE.md`. Documento de design que sobrevive à
+entrega vira contradição — foi o que aconteceu com o desenho da moeda, que
+afirmava "nada convertido é persistido" depois da migration 017 fazer o
+contrário.

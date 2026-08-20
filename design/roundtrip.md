@@ -1,5 +1,17 @@
 # Análise de Ida-e-Volta (Round-Trip) — Design da Feature
 
+<!--
+  ⚠ STATUS — leia antes de usar este documento como referência.
+
+  IMPLEMENTADO: Azul, Ryanair e British Airways (esta só com origem
+  brasileira). Coleta por PAR de datas, laço 1-para-N, teto de 3 meses entre
+  ida e volta, e teto de 5 dias por janela.
+
+  PENDENTE: LATAM (item 3 do `pendencias.md`) e a BA na UI nova, fora do
+  mercado brasileiro (item 4) — lá o scraper cai em duas buscas só-ida, o que
+  produz par com moedas diferentes.
+-->
+
 > Proposta de arquitetura para tratar viagens de ida-e-volta como uma **única
 > intenção do usuário**, capturando descontos RT quando existirem, sem explodir
 > a carga de scraping nem quebrar o reaproveitamento de tarifas entre usuários.
