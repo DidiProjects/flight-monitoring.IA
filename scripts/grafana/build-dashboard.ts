@@ -18,8 +18,8 @@ const LOG_W       = 17;
 const LOG_H       = 24;
 const CHART_W     = 7;
 const STAT_H      = 6;
-const BAR_H_HALF  = 9;   // dois gráficos de barra (scraping)
-const BAR_H_FULL  = 18;  // um gráfico de barra    (flight.api)
+const BAR_H_HALF  = 9;   // two bar charts (scraping)
+const BAR_H_FULL  = 18;  // one bar chart  (flight.api)
 
 const LOKI_DS: dashboard.DataSourceRef = { type: 'loki', uid: '${DS_LOKI}' };
 
@@ -131,20 +131,20 @@ function barPanel(
 }
 
 // ---------------------------------------------------------------------------
-// Expressões LogQL
+// LogQL expressions
 // ---------------------------------------------------------------------------
 
-// Totais para stat panels (instant query com $__range = total do período selecionado)
+// Totals for stat panels: instant query, $__range = the selected period
 const SCRAPING_TOTAL = `sum by (airline) (count_over_time({app="scraping-api", level=~"error|warning"} | json | airline != "" [$__range]))`;
 const API_TOTAL      = `sum by (level) (count_over_time({app="flight-api", level=~"error|warning"} [$__range]))`;
 
-// Série temporal para barras (range query com $__interval = granularidade do gráfico)
+// Time series for bars: range query, $__interval = the chart granularity
 const SCRAPING_ERRORS = `sum by (airline) (count_over_time({app="scraping-api", level="error"} | json | airline != "" [$__interval]))`;
 const SCRAPING_WARNS  = `sum by (airline) (count_over_time({app="scraping-api", level="warning"} | json [$__interval]))`;
 const API_ERRORS_WARNS = `sum by (level) (count_over_time({app="flight-api", level=~"error|warning"} [$__interval]))`;
 
 // ---------------------------------------------------------------------------
-// Posições Y
+// Y positions
 // ---------------------------------------------------------------------------
 
 const SCRAPING_Y = 1;
@@ -168,7 +168,7 @@ const dash = new dashboard.DashboardBuilder('Flight Monitoring — Observabilida
   .editable()
   .preload(false)
 
-  // ── Variáveis ─────────────────────────────────────────────────────────────
+  // ── Variables ─────────────────────────────────────────────────────────────
   .withVariable(
     new dashboard.DatasourceVariableBuilder('DS_LOKI')
       .label('Fonte Loki')
@@ -217,7 +217,7 @@ const dash = new dashboard.DashboardBuilder('Flight Monitoring — Observabilida
     ),
   )
 
-  // Stat: total de erros+warnings por airline no período selecionado
+  // Stat: errors + warnings per airline over the selected period
   .withPanel(
     totalStatPanel(
       'Ocorrências no período — por airline',
@@ -258,7 +258,7 @@ const dash = new dashboard.DashboardBuilder('Flight Monitoring — Observabilida
     ),
   )
 
-  // Stat: total de erros e warnings no período (duas células: error e warning)
+  // Stat: errors and warnings over the period, one cell each
   .withPanel(
     totalStatPanel(
       'Ocorrências no período',
@@ -271,7 +271,7 @@ const dash = new dashboard.DashboardBuilder('Flight Monitoring — Observabilida
     ),
   )
 
-  // Barras: erros e warnings por janela de tempo, duas séries coloridas
+  // Bars: errors and warnings per time window, two coloured series
   .withPanel(
     barPanel(
       'Erros & Warnings',
@@ -287,7 +287,7 @@ const dash = new dashboard.DashboardBuilder('Flight Monitoring — Observabilida
   .build();
 
 // ---------------------------------------------------------------------------
-// Saída
+// Output
 // ---------------------------------------------------------------------------
 
 const outputPath = path.resolve(__dirname, '../../grafana-flight-monitoring.json');
