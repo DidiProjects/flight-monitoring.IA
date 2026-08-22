@@ -1,23 +1,23 @@
 /**
- * Contrato do protocolo de tempo real do ecossistema flight-monitoring.
+ * Real-time protocol contract for the flight-monitoring ecosystem.
  *
- * FONTE ÚNICA DA VERDADE — copiar/sincronizar nos três projetos:
- *   • scraping.API  (worker)  → produz telemetria, consome comandos
- *   • flight.API    (hub)     → consome telemetria, produz comandos, faz fan-out SSE
- *   • flight.FRONT  (admin)   → consome eventos SSE
+ * SINGLE SOURCE OF TRUTH — copy/sync across the three projects:
+ *   • scraping.API  (worker)  → produces telemetry, consumes commands
+ *   • flight.API    (hub)     → consumes telemetry, produces commands, SSE fan-out
+ *   • flight.FRONT  (admin)   → consumes SSE events
  *
- * Spec correspondente: features.md §§13–19.
- * Transportes: WebSocket (worker ↔ hub) · SSE + REST (hub ↔ front).
+ * Matching spec: features.md §§13–19.
+ * Transports: WebSocket (worker ↔ hub) · SSE + REST (hub ↔ front).
  */
 
-/** Versão do protocolo. Incrementar em mudança incompatível. */
+/** Protocol version. Bump on a breaking change. */
 export const PROTOCOL_VERSION = 1 as const;
 
 // ───────────────────────────────────────────────────────────────────────────
-// Enums de domínio
+// Domain enums
 // ───────────────────────────────────────────────────────────────────────────
 
-/** Estado terminal/atual de uma EXECUÇÃO (analysis_run). */
+/** Current or terminal state of a RUN (analysis_run). */
 export type RunStatus =
   | 'running'
   | 'success'
@@ -26,10 +26,10 @@ export type RunStatus =
   | 'blocked'
   | 'cancelled';
 
-/** Fase de vida do job dentro do worker (granularidade de cancelamento). */
+/** Job lifecycle phase inside the worker — the granularity cancellation acts on. */
 export type JobPhase = 'queued' | 'running' | 'finishing';
 
-/** Etapas reportadas em job.progress (marcos do scraper). */
+/** Steps reported in job.progress. */
 export type ScrapeStep =
   | 'navigate'
   | 'fill_form'
@@ -38,7 +38,7 @@ export type ScrapeStep =
   | 'calendar'
   | 'cooldown';
 
-/** Categoria de erro (espelha categorizeError do runner do scraping.API). */
+/** Error category. Mirrors categorizeError in the scraping.API runner. */
 export type ErrorType =
   | 'bot_detection'
   | 'timeout'
@@ -48,21 +48,21 @@ export type ErrorType =
 
 export type LogLevel = 'info' | 'warn' | 'error';
 
-/** Resultado do ack de um comando cancel. */
+/** Outcome carried by the ack of a cancel command. */
 export type CancelResult =
-  | 'aborted'        // job em execução foi interrompido
-  | 'queued_removed' // job estava só na fila e foi descartado antes de rodar
-  | 'not_found';     // requestId desconhecido (já finalizou — corrida) → no-op
+  | 'aborted'        // a running job was interrupted
+  | 'queued_removed' // job was only queued and got discarded before running
+  | 'not_found';     // unknown requestId (already finished — a race) → no-op
 
 // ───────────────────────────────────────────────────────────────────────────
-// Envelope comum (todas as mensagens, WS e SSE)
+// Shared envelope (every message, WS and SSE)
 // ───────────────────────────────────────────────────────────────────────────
 
 /**
- * Envelope genérico. `T` é o literal de `type`, `P` o payload.
- * - `id`: id da mensagem (correlação de comando/ack).
- * - `requestId`: job alvo (ausente em mensagens de conexão como hello/ping).
- * - `seq`: sequência monotônica POR job (ordenação/dedup idempotente).
+ * Generic envelope. `T` is the `type` literal, `P` the payload.
+ * - `id`: message id, correlating a command with its ack.
+ * - `requestId`: target job. Absent on connection messages such as hello/ping.
+ * - `seq`: monotonic sequence PER job, for ordering and idempotent dedup.
  */
 export interface Envelope<T extends string, P> {
   v: typeof PROTOCOL_VERSION;
@@ -80,17 +80,17 @@ export interface Envelope<T extends string, P> {
 
 export interface WorkerHelloPayload {
   workerId: string;
-  version: string;       // versão do scraping.API
-  /** Preferir auth via header x-api-key no handshake; campo opcional p/ fallback. */
+  version: string;       // scraping.API version
+  /** Prefer x-api-key on the handshake; this field is the fallback. */
   apiKey?: string;
 }
 
 export interface HelloAckPayload {
-  heartbeatMs: number;   // intervalo de ping que o hub usará
-  serverTime: string;    // ISO — base p/ alinhar relógios
+  heartbeatMs: number;   // ping interval the hub will use
+  serverTime: string;    // ISO — clock alignment baseline
 }
 
-/** Estado mínimo de um job, usado na reconciliação por snapshot. */
+/** Minimum job state, used by snapshot reconciliation. */
 export interface JobStateSnapshot {
   requestId: string;
   phase: JobPhase;
@@ -135,11 +135,11 @@ export interface JobFinishedPayload {
   durationMs: number;
   error?: string;
   errorType?: ErrorType;
-  phase?: JobPhase; // útil em cancelamento (ex.: 'queued')
+  phase?: JobPhase; // useful on cancellation (e.g. 'queued')
 }
 
 export interface CancelPayload {
-  /** Quem solicitou (auditoria → analysis_runs.cancelled_by). */
+  /** Who asked for it — audited into analysis_runs.cancelled_by. */
   requestedBy?: string;
 }
 
@@ -151,7 +151,7 @@ export interface CancelAckPayload {
 export type EmptyPayload = Record<string, never>;
 
 // ───────────────────────────────────────────────────────────────────────────
-// WebSocket: Worker → Hub (telemetria + acks)
+// WebSocket: Worker → Hub (telemetry + acks)
 // ───────────────────────────────────────────────────────────────────────────
 
 export type WorkerHello     = Envelope<'worker.hello', WorkerHelloPayload>;
@@ -178,37 +178,37 @@ export type WorkerToHubMessage =
   | Pong;
 
 // ───────────────────────────────────────────────────────────────────────────
-// WebSocket: Hub → Worker (controle)
+// WebSocket: Hub → Worker (control)
 // ───────────────────────────────────────────────────────────────────────────
 
 export type HelloAck = Envelope<'hello.ack', HelloAckPayload>;
-export type Cancel   = Envelope<'cancel', CancelPayload>;   // requestId obrigatório em uso
+export type Cancel   = Envelope<'cancel', CancelPayload>;   // requestId is required in practice
 export type Ping     = Envelope<'ping', EmptyPayload>;
 
 export type HubToWorkerMessage = HelloAck | Cancel | Ping;
 
 // ───────────────────────────────────────────────────────────────────────────
-// SSE: Hub → Front (estado consolidado p/ a UI Admin)
+// SSE: Hub → Front (consolidated state for the Admin UI)
 // ───────────────────────────────────────────────────────────────────────────
 
-/** Visão consolidada de um job para a tabela do Admin. */
+/** Consolidated view of a job for the Admin table. */
 export interface JobView {
   requestId: string;
-  jobId?: string;        // scraping_jobs.id (pode ser null após cleanup)
+  jobId?: string;        // scraping_jobs.id (may be null after cleanup)
   airline: string;
   origin: string;
   destination: string;
   flightDate: string;    // YYYY-MM-DD
   status: RunStatus;
   phase?: JobPhase;
-  runningSince?: string; // ISO — autoritativo do hub (calcular duração no front, §18.2)
+  runningSince?: string; // ISO — hub is authoritative; the front derives duration (§18.2)
   faresFound?: number;
   lastStep?: ScrapeStep;
   error?: string;
   workerId?: string;
 }
 
-/** Linha de timeline/log projetada para a UI (deriva de job.progress/log/finished). */
+/** Timeline row projected for the UI, derived from job.progress/log/finished. */
 export interface JobEventLine {
   requestId: string;
   seq: number;
@@ -238,23 +238,23 @@ export type HubToFrontEvent =
   | SseAirlinePaused;
 
 // ───────────────────────────────────────────────────────────────────────────
-// REST: ações do front (não-streaming)
+// REST: front actions (non-streaming)
 // ───────────────────────────────────────────────────────────────────────────
 
-/** POST /flight/scraping-jobs/:requestId/cancel — corpo opcional. */
+/** POST /flight/scraping-jobs/:requestId/cancel — body is optional. */
 export interface CancelJobRequest {
   reason?: string;
 }
 
-/** Resposta do cancel (a confirmação real chega depois via SSE job.upsert). */
+/** Cancel response. The real confirmation arrives later via SSE job.upsert. */
 export interface CancelJobResponse {
   accepted: boolean;
-  /** 'dispatched' = comando enviado ao worker; 'queued' = worker offline, intenção persistida. */
+  /** 'dispatched' = sent to the worker; 'queued' = worker offline, intent persisted. */
   delivery: 'dispatched' | 'queued';
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Type guards utilitários
+// Type guards
 // ───────────────────────────────────────────────────────────────────────────
 
 export function isWorkerMessage(msg: { type: string }): msg is WorkerToHubMessage {
